@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}Business Profile{% endblock %}
+{% block page_title %}Business Profile & Settings{% endblock %}
+
+{% block header_actions %}
+<button form="profileForm" type="submit"
+        class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2 rounded-lg flex items-center gap-2">
+  <i class="fas fa-save"></i> Save Profile
+</button>
+{% endblock %}
+
+{% block content %}
+
+{% if success %}
+<div class="mb-5 flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm" data-flash>
+  <i class="fas fa-circle-check"></i> Profile saved successfully!
+</div>
+{% endif %}
+
+<!-- Plan banner -->
+<div class="mb-6 rounded-xl overflow-hidden border {% if profile.is_pro %}border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-50{% else %}border-indigo-200 bg-gradient-to-r from-indigo-50 to-violet-50{% endif %} p-4 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+    <span class="text-2xl">{% if profile.is_pro %}⭐{% else %}🆓{% endif %}</span>
+    <div>
+      <p class="font-bold {% if profile.is_pro %}text-amber-700{% else %}text-indigo-700{% endif %}">
+        {% if profile.is_pro %}Pro Plan — Unlimited Everything{% else %}Free Plan — 3 invoices / 2 clients per month{% endif %}
+      </p>
+      <p class="text-xs {% if profile.is_pro %}text-amber-600{% else %}text-indigo-500{% endif %}">
+        {% if profile.is_pro %}Thank you for supporting Tax-Ready Invoice!
+        {% else %}Upgrade to Pro for unlimited invoices, AI categories, tax reports & logo branding{% endif %}
+      </p>
+    </div>
+  </div>
+  {% if not profile.is_pro %}
+  <a href="/billing/upgrade"
+     class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-5 py-2.5 rounded-lg whitespace-nowrap flex items-center gap-2 transition-colors">
+    ⭐ Upgrade — $9/mo
+  </a>
+  {% endif %}
+</div>
+
+<form id="profileForm" method="POST" action="/profile/save" enctype="multipart/form-data"
+      class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+  <!-- ── Business Info ──────────────────────────────────────────────────── -->
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
+    <h3 class="font-bold text-slate-700 flex items-center gap-2">
+      <i class="fas fa-building text-indigo-400"></i> Business Information
+    </h3>
+
+    <div>
+      <label class="field-label">Business / Trading Name</label>
+      <input name="business_name" type="text" class="field-input"
+             value="{{ profile.business_name or '' }}" placeholder="Acme Creative Studio"/>
+    </div>
+    <div>
+      <label class="field-label">Business Registration Number</label>
+      <input name="business_reg_number" type="text" class="field-input"
+             value="{{ profile.business_reg_number or '' }}" placeholder="e.g. 12345678 or VAT EU123456789"/>
+      <p class="text-xs text-slate-400 mt-1">Shown on every invoice (VAT, company reg, EIN, etc.)</p>
+    </div>
+    <div>
+      <label class="field-label">Business Email</label>
+      <input name="business_email" type="email" class="field-input"
+             value="{{ profile.business_email or '' }}" placeholder="billing@yourbusiness.com"/>
+    </div>
+    <div>
+      <label class="field-label">Business Phone</label>
+      <input name="business_phone" type="tel" class="field-input"
+             value="{{ profile.business_phone or '' }}" placeholder="+1 555 0100"/>
+    </div>
+    <div>
+      <label class="field-label">Business Address</label>
+      <textarea name="business_address" rows="3" class="field-input"
+                placeholder="123 Main St&#10;City, Country">{{ profile.business_address or '' }}</textarea>
+    </div>
+    <div>
+      <label class="field-label">Website</label>
+      <input name="business_website" type="url" class="field-input"
+             value="{{ profile.business_website or '' }}" placeholder="https://yourbusiness.com"/>
+    </div>
+  </div>
+
+  <!-- ── Logo & Template ────────────────────────────────────────────────── -->
+  <div class="space-y-5">
+
+    <!-- Logo upload -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
+      <h3 class="font-bold text-slate-700 flex items-center gap-2">
+        <i class="fas fa-image text-indigo-400"></i> Logo
+      </h3>
+
+      {% if profile.logo_base64 %}
+      <div class="flex items-start gap-4">
+        <img src="{{ profile.logo_base64 }}" class="h-16 w-auto object-contain rounded border border-slate-200 bg-slate-50 p-1"/>
+        <div>
+          <p class="text-sm text-slate-600 mb-2">Current logo</p>
+          <label class="cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 rounded-lg">
+            Change Logo <input type="file" name="logo" accept="image/*" class="hidden" onchange="previewLogo(this)"/>
+          </label>
+          <button type="button" onclick="document.getElementById('rm_logo').value='1'; document.getElementById('logoPreview').style.display='none';"
+                  class="ml-2 text-red-500 hover:text-red-700 text-xs font-medium">
+            Remove
+          </button>
+        </div>
+      </div>
+      {% else %}
+      <!-- Drop zone -->
+      <div id="dropZone"
+           class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors"
+           onclick="document.getElementById('logoInput').click()"
+           ondragover="event.preventDefault();this.classList.add('border-indigo-500','bg-indigo-50')"
+           ondrop="handleDrop(event)">
+        <div id="dropContent">
+          <i class="fas fa-cloud-arrow-up text-3xl text-slate-300 mb-2"></i>
+          <p class="text-sm text-slate-500 font-medium">Click or drag your logo here</p>
+          <p class="text-xs text-slate-400 mt-1">PNG, JPG, SVG — max 500 KB</p>
+        </div>
+        <div id="logoPreview" class="hidden">
+          <img id="logoImg" class="mx-auto h-20 object-contain rounded"/>
+          <p class="text-xs text-emerald-600 mt-2 font-medium">✓ Logo ready to save</p>
+        </div>
+        <input id="logoInput" type="file" name="logo" accept="image/*" class="hidden" onchange="previewLogo(this)"/>
+      </div>
+      {% endif %}
+      <input type="hidden" name="remove_logo" id="rm_logo" value=""/>
+    </div>
+
+    <!-- Invoice template picker -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+      <h3 class="font-bold text-slate-700 mb-4 flex items-center gap-2">
+        <i class="fas fa-palette text-indigo-400"></i> Default Invoice Template
+      </h3>
+      <div class="grid grid-cols-3 gap-3">
+        {% for tmpl in invoice_templates %}
+        <label class="cursor-pointer">
+          <input type="radio" name="invoice_template" value="{{ tmpl.id }}" class="sr-only peer"
+                 {% if profile.invoice_template == tmpl.id %}checked{% endif %}>
+          <div class="peer-checked:ring-2 peer-checked:ring-indigo-500 peer-checked:bg-indigo-50
+                      border border-slate-200 rounded-xl p-3 text-center hover:border-indigo-300 transition-all">
+            <!-- Mini preview swatch -->
+            <div class="h-10 rounded-lg mb-2 overflow-hidden
+                        {% if tmpl.id == 'minimal' %}bg-white border border-slate-200{% endif %}
+                        {% if tmpl.id == 'bold' %}bg-slate-900{% endif %}
+                        {% if tmpl.id == 'creative' %}bg-gradient-to-br from-indigo-500 to-violet-500{% endif %}">
+              <div class="h-3 w-full
+                          {% if tmpl.id == 'minimal' %}bg-slate-100{% endif %}
+                          {% if tmpl.id == 'bold' %}bg-slate-800{% endif %}
+                          {% if tmpl.id == 'creative' %}bg-white/20{% endif %}"></div>
+            </div>
+            <p class="text-xs font-bold text-slate-700">{{ tmpl.name }}</p>
+            <p class="text-xs text-slate-400 leading-tight mt-0.5">{{ tmpl.desc }}</p>
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Payment Details ────────────────────────────────────────────────── -->
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4 lg:col-span-2">
+    <h3 class="font-bold text-slate-700 flex items-center gap-2">
+      <i class="fas fa-credit-card text-indigo-400"></i> Default Payment Details
+      <span class="text-xs text-slate-400 font-normal ml-1">(auto-filled on every new invoice)</span>
+    </h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="md:col-span-2">
+        <label class="field-label">Payment Instructions</label>
+        <textarea name="payment_instructions" rows="4" class="field-input font-mono text-xs"
+                  placeholder="Bank: Barclays UK&#10;Account name: Acme Creative&#10;Account number: 12345678&#10;Sort code: 00-00-00&#10;IBAN: GB00 BARC 0000 0012 3456 78">{{ profile.payment_instructions or '' }}</textarea>
+        <p class="text-xs text-slate-400 mt-1">Shown at the bottom of every invoice. Include bank, IBAN, reference instructions, etc.</p>
+      </div>
+      <div>
+        <label class="field-label">PayPal Email</label>
+        <input name="paypal_email" type="email" class="field-input"
+               value="{{ profile.paypal_email or '' }}" placeholder="payments@yourbusiness.com"/>
+      </div>
+      <div>
+        <label class="field-label">Bank Details (short form)</label>
+        <input name="bank_details" type="text" class="field-input"
+               value="{{ profile.bank_details or '' }}" placeholder="Barclays · Acc: 12345678 · Sort: 00-00-00"/>
+      </div>
+    </div>
+  </div>
+
+</form>
+
+<style>
+.field-label { display:block; font-size:.7rem; font-weight:600; color:#64748b; margin-bottom:.3rem; text-transform:uppercase; letter-spacing:.05em; }
+.field-input { width:100%; border:1px solid #e2e8f0; border-radius:.5rem; padding:.65rem .75rem; font-size:.875rem; outline:none; transition:box-shadow .15s; }
+.field-input:focus { box-shadow:0 0 0 2px #818cf8; border-color:#818cf8; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function previewLogo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('logoImg').src = e.target.result;
+    document.getElementById('logoPreview').classList.remove('hidden');
+    document.getElementById('dropContent').classList.add('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (!file || !file.type.startsWith('image/')) return;
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  document.getElementById('logoInput').files = dt.files;
+  previewLogo(document.getElementById('logoInput'));
+}
+</script>
+{% endblock %}

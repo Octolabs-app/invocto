@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Upgrade to Pro{% endblock %}
+{% block page_title %}Upgrade to Pro{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+
+  <!-- Hero -->
+  <div class="text-center mb-10">
+    <div class="inline-flex items-center gap-2 bg-amber-100 text-amber-700 rounded-full px-4 py-1.5 text-sm font-semibold mb-4">
+      ⭐ Most Popular
+    </div>
+    <h2 class="text-3xl font-bold text-slate-800 mb-2">Unlock the full power of Tax-Ready</h2>
+    <p class="text-slate-500 text-lg">Everything you need to run a professional freelance business</p>
+  </div>
+
+  <!-- Pricing card -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+
+    <!-- Free -->
+    <div class="bg-white rounded-2xl border-2 border-slate-200 p-8">
+      <div class="mb-6">
+        <h3 class="text-xl font-bold text-slate-700 mb-1">Free</h3>
+        <p class="text-slate-400 text-sm">Get started, no card needed</p>
+      </div>
+      <div class="text-4xl font-black text-slate-800 mb-6">$0</div>
+      <ul class="space-y-3 mb-8">
+        {% for feat in [
+          ("✓","3 invoices per month"),
+          ("✓","2 clients"),
+          ("✓","Basic dashboard"),
+          ("✗","AI categorization","text-slate-300"),
+          ("✗","Logo branding","text-slate-300"),
+          ("✗","Tax reports","text-slate-300"),
+          ("✗","Invoice templates","text-slate-300"),
+          ("✗","Expense tracking","text-slate-300"),
+          ("✗","CSV / PDF export","text-slate-300"),
+        ] %}
+        <li class="flex items-center gap-3 {{ feat[2] if feat|length > 2 else '' }}">
+          <span class="font-bold {{ 'text-emerald-500' if feat[0] == '✓' else 'text-slate-300' }}">{{ feat[0] }}</span>
+          <span class="text-sm">{{ feat[1] }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% if not profile.is_pro %}
+      <div class="w-full text-center py-2.5 rounded-xl border border-slate-300 text-slate-500 text-sm font-semibold">
+        Current plan
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Pro -->
+    <div class="bg-gradient-to-br from-indigo-600 to-violet-600 rounded-2xl p-8 text-white shadow-xl shadow-indigo-200 relative overflow-hidden">
+      <div class="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-10 translate-x-10"></div>
+      <div class="relative">
+        <div class="mb-6">
+          <h3 class="text-xl font-bold mb-1">Pro</h3>
+          <p class="text-indigo-200 text-sm">For serious freelancers</p>
+        </div>
+        <div class="flex items-end gap-1 mb-1">
+          <span class="text-4xl font-black">$9</span>
+          <span class="text-indigo-200 mb-2">/month</span>
+        </div>
+        <p class="text-indigo-300 text-xs mb-6">Cancel anytime · No hidden fees</p>
+        <ul class="space-y-3 mb-8">
+          {% for feat in [
+            "Unlimited invoices",
+            "Unlimited clients",
+            "AI category suggestions",
+            "Custom logo on invoices",
+            "3 invoice templates",
+            "Tax reports (quarterly + annual)",
+            "Expense tracking",
+            "CSV & PDF export",
+            "Invoice templates",
+            "Payment details on invoice",
+            "Priority support",
+          ] %}
+          <li class="flex items-center gap-3">
+            <span class="text-emerald-300 font-bold">✓</span>
+            <span class="text-sm text-indigo-100">{{ feat }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+
+        {% if profile.is_pro %}
+        <div class="w-full text-center py-2.5 rounded-xl bg-white/20 text-white text-sm font-semibold">
+          ✓ You're on Pro
+        </div>
+        {% else %}
+        <form method="POST" action="/billing/create-checkout">
+          <button type="submit"
+                  class="w-full bg-white text-indigo-700 font-bold py-3 rounded-xl hover:bg-indigo-50 transition-colors text-sm shadow-lg">
+            Start Pro — $9/month
+          </button>
+        </form>
+        <p class="text-center text-indigo-300 text-xs mt-3">Secure payment via Stripe · Cancel anytime</p>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FAQ -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-8">
+    <h3 class="font-bold text-slate-700 text-lg mb-5">Frequently Asked Questions</h3>
+    <div class="space-y-4">
+      {% for q, a in [
+        ("Can I cancel anytime?", "Yes — cancel any time from your profile page. You keep Pro access until the end of your billing period."),
+        ("Is my payment secure?", "Absolutely. Payments are handled entirely by Stripe, a PCI-compliant payment processor used by millions of businesses. We never see your card details."),
+        ("What happens to my invoices if I downgrade?", "All your data is preserved. You just won't be able to create new invoices beyond the free limit until you re-upgrade."),
+        ("Do you offer a refund?", "Yes — within 7 days of your first payment, no questions asked. Email us and we'll process it immediately."),
+      ] %}
+      <details class="group border border-slate-100 rounded-xl">
+        <summary class="flex items-center justify-between px-5 py-3.5 cursor-pointer font-medium text-slate-700 text-sm list-none">
+          {{ q }}
+          <i class="fas fa-chevron-down text-slate-400 group-open:rotate-180 transition-transform text-xs"></i>
+        </summary>
+        <p class="px-5 pb-4 text-sm text-slate-500">{{ a }}</p>
+      </details>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

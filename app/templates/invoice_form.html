@@ -1,243 +1,369 @@
 {% extends "base.html" %}
+{% block title %}{{ "Edit" if invoice else "New" }} Invoice{% endblock %}
+{% block page_title %}{{ "Edit " + invoice.invoice_number if invoice else "Create Invoice" }}{% endblock %}
 
-{% block title %}{{ "Edit" if invoice else "New" }} Invoice — Tax-Ready Invoice{% endblock %}
-{% block page_title %}{{ "Edit Invoice " + invoice.invoice_number if invoice else "Create Invoice" }}{% endblock %}
+{% block header_actions %}
+<button onclick="submitForm()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2 rounded-lg flex items-center gap-2">
+  <i class="fas fa-save"></i> {{ "Save Changes" if invoice else "Create Invoice" }}
+</button>
+{% endblock %}
 
 {% block content %}
+<div class="flex gap-6 h-full" style="min-height:calc(100vh - 120px)">
 
-<div class="max-w-3xl mx-auto">
-<form method="POST"
-      action="{{ '/invoices/' + invoice.id|string + '/edit' if invoice else '/invoices/new' }}"
-      class="space-y-6">
+  <!-- ── LEFT: Form ──────────────────────────────────────────────────────── -->
+  <div class="w-full xl:w-1/2 space-y-4 overflow-y-auto pb-8">
+  <form id="invoiceForm" method="POST"
+        action="{{ '/invoices/' + invoice.id|string + '/edit' if invoice else '/invoices/new' }}">
 
-  <!-- ── Basic details card ──────────────────────────────────────────────── -->
-  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-    <h3 class="font-semibold text-slate-700 mb-4">Invoice Details</h3>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-      <!-- Invoice number -->
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Invoice Number</label>
-        <input name="invoice_number" type="text"
-               value="{{ invoice.invoice_number if invoice else next_number }}"
-               {% if invoice %}readonly{% endif %}
-               class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm
-                      {% if invoice %}bg-slate-50 text-slate-500{% else %}focus:ring-2 focus:ring-indigo-500{% endif %}
-                      focus:outline-none" />
-      </div>
-
-      <!-- Client -->
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Client <span class="text-red-500">*</span></label>
-        <select name="client_id" required
-                class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-          {% for client in clients %}
-          <option value="{{ client.id }}"
-                  {% if invoice and invoice.client_id == client.id %}selected{% endif %}>
-            {{ client.name }}
-          </option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <!-- Due date -->
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Due Date <span class="text-red-500">*</span></label>
-        <input name="due_date" type="date" required
-               value="{{ invoice.due_date.isoformat() if invoice else '' }}"
-               min="{{ today }}"
-               class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      </div>
-
-      <!-- Currency -->
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Currency</label>
-        <select name="currency"
-                class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-          {% for cur in currencies %}
-          <option value="{{ cur }}" {% if invoice and invoice.currency == cur %}selected{% endif %}>{{ cur }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <!-- Category (editable on edit, auto-filled on create) -->
-      {% if invoice %}
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">
-          Category
-          <span class="text-indigo-500 text-xs font-normal ml-1">← AI suggested, you can change it</span>
-        </label>
-        <select name="category"
-                class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-          {% for cat in categories %}
-          <option value="{{ cat }}" {% if invoice.category == cat %}selected{% endif %}>{{ cat }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      {% endif %}
-
-      <!-- Notes -->
-      <div class="sm:col-span-2">
-        <label class="block text-sm font-medium text-slate-700 mb-1">Notes (optional)</label>
-        <textarea name="notes" rows="2"
-                  class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Payment terms, project details…">{{ invoice.notes if invoice else "" }}</textarea>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- ── Line items card ─────────────────────────────────────────────────── -->
-  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-    <div class="flex items-center justify-between mb-4">
-      <h3 class="font-semibold text-slate-700">Line Items</h3>
-      <button type="button" onclick="addLineItem()"
-              class="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 text-sm font-medium">
-        <i class="fas fa-plus-circle"></i> Add Row
-      </button>
-    </div>
-
-    <!-- Column headers (hidden on mobile) -->
-    <div class="hidden sm:grid grid-cols-12 gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 px-1">
-      <div class="col-span-6">Description</div>
-      <div class="col-span-2 text-center">Qty</div>
-      <div class="col-span-2 text-right">Unit Price</div>
-      <div class="col-span-2 text-right">Total</div>
-    </div>
-
-    <!-- Line item rows -->
-    <div id="lineItemsContainer" class="space-y-2">
-      {% if invoice and invoice.line_items %}
-        {% for item in invoice.line_items %}
-        <div class="line-item-row grid grid-cols-12 gap-2 items-center">
-          <input name="description[]" type="text" required placeholder="e.g. Logo design"
-                 value="{{ item.description }}"
-                 class="col-span-12 sm:col-span-6 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <input name="quantity[]" type="number" step="0.01" min="0" required
-                 value="{{ item.quantity }}"
-                 oninput="calcRow(this)"
-                 class="col-span-4 sm:col-span-2 border border-slate-300 rounded-lg px-3 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <input name="unit_price[]" type="number" step="0.01" min="0" required
-                 value="{{ item.unit_price }}"
-                 oninput="calcRow(this)"
-                 class="col-span-5 sm:col-span-2 border border-slate-300 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <div class="col-span-2 sm:col-span-2 flex items-center justify-end gap-1">
-            <span class="line-total text-sm font-semibold text-slate-700 min-w-[60px] text-right">
-              {{ "%.2f"|format(item.line_total) }}
-            </span>
-            <button type="button" onclick="removeLineItem(this)"
-                    class="text-slate-300 hover:text-red-500 transition-colors text-lg leading-none ml-1">&times;</button>
-          </div>
+    <!-- Basic details -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+      <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+        <span class="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">1</span>
+        Invoice Details
+      </h3>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="label">Invoice #</label>
+          <input name="invoice_number" id="f_number" type="text"
+                 value="{{ invoice.invoice_number if invoice else next_number }}"
+                 {% if invoice %}readonly{% endif %}
+                 oninput="preview()"
+                 class="input {% if invoice %}bg-slate-50 text-slate-400{% endif %}"/>
         </div>
-        {% endfor %}
-      {% else %}
-        <!-- Default 2 empty rows on new invoice -->
-        <div class="line-item-row grid grid-cols-12 gap-2 items-center">
-          <input name="description[]" type="text" placeholder="e.g. Logo design"
-                 class="col-span-12 sm:col-span-6 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <input name="quantity[]" type="number" step="0.01" min="0" value="1"
-                 oninput="calcRow(this)"
-                 class="col-span-4 sm:col-span-2 border border-slate-300 rounded-lg px-3 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <input name="unit_price[]" type="number" step="0.01" min="0" value="0"
-                 oninput="calcRow(this)"
-                 class="col-span-5 sm:col-span-2 border border-slate-300 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <div class="col-span-2 sm:col-span-2 flex items-center justify-end gap-1">
-            <span class="line-total text-sm font-semibold text-slate-700 min-w-[60px] text-right">0.00</span>
-            <button type="button" onclick="removeLineItem(this)"
-                    class="text-slate-300 hover:text-red-500 transition-colors text-lg leading-none ml-1">&times;</button>
-          </div>
+        <div>
+          <label class="label">Client <span class="text-red-400">*</span></label>
+          <select name="client_id" id="f_client" onchange="preview()" class="input bg-white">
+            {% for c in clients %}
+            <option value="{{ c.id }}" data-name="{{ c.name }}" data-email="{{ c.email or '' }}" data-address="{{ c.address or '' }}"
+              {% if invoice and invoice.client_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+          </select>
         </div>
-      {% endif %}
+        <div>
+          <label class="label">Due Date <span class="text-red-400">*</span></label>
+          <input name="due_date" id="f_due" type="date" required oninput="preview()"
+                 value="{{ invoice.due_date.isoformat() if invoice else '' }}"
+                 class="input"/>
+        </div>
+        <div>
+          <label class="label">Currency</label>
+          <select name="currency" id="f_currency" onchange="preview()" class="input bg-white">
+            {% for cur in currencies %}
+            <option value="{{ cur }}" {% if invoice and invoice.currency == cur %}selected{% elif not invoice and cur == "USD" %}selected{% endif %}>{{ cur }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="label">Template</label>
+          <select name="template" id="f_template" onchange="applyTemplate(this.value); preview();" class="input bg-white">
+            <option value="minimal"  {% if (invoice and invoice.template == 'minimal')  or (profile and profile.invoice_template == 'minimal')  %}selected{% endif %}>Minimal</option>
+            <option value="bold"     {% if (invoice and invoice.template == 'bold')     or (profile and profile.invoice_template == 'bold')     %}selected{% endif %}>Bold</option>
+            <option value="creative" {% if (invoice and invoice.template == 'creative') or (profile and profile.invoice_template == 'creative') %}selected{% endif %}>Creative</option>
+          </select>
+        </div>
+        {% if invoice %}
+        <div>
+          <label class="label">Category</label>
+          <select name="category" onchange="preview()" class="input bg-white">
+            {% for cat in categories %}
+            <option value="{{ cat }}" {% if invoice.category == cat %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+      </div>
     </div>
 
-    <!-- Grand total -->
-    <div class="flex justify-end mt-4 pt-4 border-t border-slate-200">
-      <div class="text-right">
-        <p class="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1">Invoice Total</p>
-        <p id="grandTotal" class="text-2xl font-bold text-indigo-700">
-          {% if invoice %}{{ "%.2f"|format(invoice.total) }}{% else %}0.00{% endif %}
-        </p>
+    <!-- Line items -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-slate-700 flex items-center gap-2">
+          <span class="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">2</span>
+          Line Items
+        </h3>
+        <button type="button" onclick="addRow()" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center gap-1">
+          <i class="fas fa-plus-circle"></i> Add Row
+        </button>
+      </div>
+      <div class="grid grid-cols-12 gap-1 text-xs font-semibold text-slate-400 uppercase mb-1 px-1 hidden sm:grid">
+        <div class="col-span-6">Description</div><div class="col-span-2 text-center">Qty</div>
+        <div class="col-span-2 text-right">Price</div><div class="col-span-2 text-right">Total</div>
+      </div>
+      <div id="rows" class="space-y-2">
+        {% if invoice and invoice.line_items %}
+          {% for item in invoice.line_items %}
+          <div class="row grid grid-cols-12 gap-1 items-center">
+            <input name="description[]" type="text" value="{{ item.description }}" oninput="calcRow(this);preview()" placeholder="Service…" class="col-span-12 sm:col-span-6 input text-sm"/>
+            <input name="quantity[]"    type="number" step="0.01" min="0" value="{{ item.quantity }}" oninput="calcRow(this);preview()" class="col-span-4 sm:col-span-2 input text-sm text-center"/>
+            <input name="unit_price[]"  type="number" step="0.01" min="0" value="{{ item.unit_price }}" oninput="calcRow(this);preview()" class="col-span-5 sm:col-span-2 input text-sm text-right"/>
+            <div class="col-span-3 sm:col-span-2 flex items-center justify-end gap-1">
+              <span class="row-total text-sm font-semibold text-slate-700 min-w-[50px] text-right">{{ "%.2f"|format(item.line_total) }}</span>
+              <button type="button" onclick="removeRow(this)" class="text-slate-300 hover:text-red-500 text-lg ml-1 leading-none">&times;</button>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="row grid grid-cols-12 gap-1 items-center">
+            <input name="description[]" type="text" oninput="calcRow(this);preview()" placeholder="e.g. Logo Design" class="col-span-12 sm:col-span-6 input text-sm"/>
+            <input name="quantity[]"    type="number" step="0.01" min="0" value="1" oninput="calcRow(this);preview()" class="col-span-4 sm:col-span-2 input text-sm text-center"/>
+            <input name="unit_price[]"  type="number" step="0.01" min="0" value="0" oninput="calcRow(this);preview()" class="col-span-5 sm:col-span-2 input text-sm text-right"/>
+            <div class="col-span-3 sm:col-span-2 flex items-center justify-end gap-1">
+              <span class="row-total text-sm font-semibold text-slate-700 min-w-[50px] text-right">0.00</span>
+              <button type="button" onclick="removeRow(this)" class="text-slate-300 hover:text-red-500 text-lg ml-1 leading-none">&times;</button>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+      <div class="flex justify-end mt-3 pt-3 border-t border-slate-200">
+        <div class="text-right">
+          <p class="text-xs text-slate-400 uppercase font-semibold">Total</p>
+          <p id="grand" class="text-2xl font-bold text-indigo-700">
+            {% if invoice %}{{ "%.2f"|format(invoice.total) }}{% else %}0.00{% endif %}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes & Payment -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+      <h3 class="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+        <span class="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">3</span>
+        Notes & Payment Info
+      </h3>
+      <div class="space-y-3">
+        <div>
+          <label class="label">Notes to Client</label>
+          <textarea name="notes" id="f_notes" rows="2" oninput="preview()"
+                    class="input" placeholder="Payment terms, project details…">{{ invoice.notes if invoice else "" }}</textarea>
+        </div>
+        <div>
+          <label class="label">Payment Instructions</label>
+          <textarea name="payment_note" id="f_payment" rows="3" oninput="preview()"
+                    class="input" placeholder="Bank: Barclays&#10;Account: 1234 5678&#10;Sort: 00-00-00&#10;PayPal: you@email.com">{{ invoice.payment_note if invoice else (profile.payment_instructions if profile else "") }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Save as template -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+      <h3 class="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+        <span class="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">4</span>
+        Save as Template (optional)
+      </h3>
+      <div class="flex items-center gap-3">
+        <input type="checkbox" name="save_as_template" id="save_tmpl" class="w-4 h-4 accent-indigo-600"
+               onchange="document.getElementById('tmpl_name_wrap').style.display=this.checked?'block':'none'"
+               {% if invoice and invoice.is_template %}checked{% endif %}>
+        <label for="save_tmpl" class="text-sm text-slate-600">Save this invoice as a reusable template</label>
+      </div>
+      <div id="tmpl_name_wrap" class="mt-2 {% if not (invoice and invoice.is_template) %}hidden{% endif %}">
+        <input name="template_name" type="text" class="input"
+               value="{{ invoice.template_name if invoice else '' }}"
+               placeholder="e.g. Standard Web Design Invoice"/>
+      </div>
+    </div>
+
+    <input type="hidden" name="category" value="{{ invoice.category if invoice else 'Other' }}">
+  </form>
+  </div>
+
+  <!-- ── RIGHT: Live Preview ─────────────────────────────────────────────── -->
+  <div class="hidden xl:block xl:w-1/2 sticky top-0 self-start pt-0">
+    <div class="bg-slate-200 rounded-2xl p-4 overflow-hidden" style="height:calc(100vh - 140px); overflow-y:auto;">
+      <p class="text-xs text-slate-500 text-center mb-3 font-medium tracking-wide uppercase">Live Preview</p>
+      <div id="previewWrap" class="bg-white rounded-xl shadow-xl overflow-hidden transform scale-90 origin-top" style="min-height:600px;">
+        <!-- Injected by JS -->
       </div>
     </div>
   </div>
 
-  <!-- ── Info box for new invoices ──────────────────────────────────────── -->
-  {% if not invoice %}
-  <div class="flex items-start gap-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-700">
-    <i class="fas fa-robot mt-0.5 text-indigo-500"></i>
-    <div>
-      <strong>AI Category</strong> — After saving, Google Gemini will analyse your line item descriptions
-      and suggest a category (Design, Writing, Video…). You can change it at any time by editing the invoice.
-    </div>
-  </div>
-  {% endif %}
-
-  <!-- ── Actions ─────────────────────────────────────────────────────────── -->
-  <div class="flex items-center gap-3">
-    <button type="submit"
-            class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-lg text-sm transition-colors">
-      {{ "Save Changes" if invoice else "Create Invoice" }}
-    </button>
-    <a href="/invoices/"
-       class="border border-slate-300 text-slate-600 hover:bg-slate-50 font-medium px-6 py-2.5 rounded-lg text-sm transition-colors">
-      Cancel
-    </a>
-  </div>
-
-</form>
 </div>
-
 {% endblock %}
 
 {% block scripts %}
+<style>
+  .label { @apply block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide; }
+  .input { @apply w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition; }
+  label.label { display:block; font-size:.7rem; font-weight:600; color:#64748b; margin-bottom:.25rem; text-transform:uppercase; letter-spacing:.05em; }
+  .input { width:100%; border:1px solid #e2e8f0; border-radius:.5rem; padding:.6rem .75rem; font-size:.875rem; outline:none; transition:box-shadow .15s; }
+  .input:focus { box-shadow:0 0 0 2px #818cf8; border-color:#818cf8; }
+  #tmpl_name_wrap.hidden { display:none; }
+</style>
+
 <script>
-  // Recalculate the row total and grand total when qty/price changes
-  function calcRow(input) {
-    const row   = input.closest(".line-item-row");
-    const qty   = parseFloat(row.querySelector("[name='quantity[]']").value)   || 0;
-    const price = parseFloat(row.querySelector("[name='unit_price[]']").value) || 0;
-    row.querySelector(".line-total").textContent = (qty * price).toFixed(2);
-    updateGrandTotal();
-  }
+// ── Data from server ──────────────────────────────────────────────────────
+const LOGO    = {{ ('"' + profile.logo_base64 + '"') | safe if profile and profile.logo_base64 else 'null' }};
+const BIZ     = {{ ('"' + (profile.business_name or '') + '"') | safe if profile else '""' }};
+const BIZ_REG = {{ ('"' + (profile.business_reg_number or '') + '"') | safe if profile else '""' }};
+const BIZ_ADDR= {{ ('"' + (profile.business_address or '').replace('\n','\\n') + '"') | safe if profile else '""' }};
+const BIZ_EMAIL={{ ('"' + (profile.business_email or '') + '"') | safe if profile else '""' }};
 
-  function updateGrandTotal() {
-    let sum = 0;
-    document.querySelectorAll(".line-total").forEach(el => {
-      sum += parseFloat(el.textContent) || 0;
-    });
-    document.getElementById("grandTotal").textContent = sum.toFixed(2);
-  }
+// ── Template colour schemes ───────────────────────────────────────────────
+const THEMES = {
+  minimal:  { bg:'#ffffff', header:'#f8fafc', accent:'#6366f1', text:'#1e293b', sub:'#64748b', border:'#e2e8f0' },
+  bold:     { bg:'#ffffff', header:'#0f172a', accent:'#f59e0b', text:'#1e293b', sub:'#64748b', border:'#e2e8f0' },
+  creative: { bg:'#ffffff', header:'linear-gradient(135deg,#6366f1,#8b5cf6)', accent:'#6366f1', text:'#1e293b', sub:'#64748b', border:'#e8e3ff' },
+};
+let currentTheme = '{{ (invoice.template if invoice else (profile.invoice_template if profile else "minimal")) }}';
 
-  function addLineItem() {
-    const container = document.getElementById("lineItemsContainer");
-    const div = document.createElement("div");
-    div.className = "line-item-row grid grid-cols-12 gap-2 items-center";
-    div.innerHTML = `
-      <input name="description[]" type="text" placeholder="Service description"
-             class="col-span-12 sm:col-span-6 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      <input name="quantity[]" type="number" step="0.01" min="0" value="1"
-             oninput="calcRow(this)"
-             class="col-span-4 sm:col-span-2 border border-slate-300 rounded-lg px-3 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      <input name="unit_price[]" type="number" step="0.01" min="0" value="0"
-             oninput="calcRow(this)"
-             class="col-span-5 sm:col-span-2 border border-slate-300 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      <div class="col-span-2 sm:col-span-2 flex items-center justify-end gap-1">
-        <span class="line-total text-sm font-semibold text-slate-700 min-w-[60px] text-right">0.00</span>
-        <button type="button" onclick="removeLineItem(this)"
-                class="text-slate-300 hover:text-red-500 transition-colors text-lg leading-none ml-1">&times;</button>
-      </div>`;
-    container.appendChild(div);
-    div.querySelector("input").focus();
-  }
+function applyTemplate(t) { currentTheme = t; preview(); }
 
-  function removeLineItem(btn) {
-    const rows = document.querySelectorAll(".line-item-row");
-    if (rows.length <= 1) return; // keep at least one row
-    btn.closest(".line-item-row").remove();
-    updateGrandTotal();
-  }
+// ── Collect form state ────────────────────────────────────────────────────
+function getState() {
+  const rows = [];
+  document.querySelectorAll('#rows .row').forEach(r => {
+    const d = r.querySelector('[name="description[]"]')?.value || '';
+    const q = parseFloat(r.querySelector('[name="quantity[]"]')?.value) || 0;
+    const p = parseFloat(r.querySelector('[name="unit_price[]"]')?.value) || 0;
+    if (d) rows.push({d, q, p, t: q*p});
+  });
 
-  // Initial grand total calculation (for edit page)
-  updateGrandTotal();
+  const clientOpt = document.querySelector('#f_client option:checked');
+  return {
+    number:   document.getElementById('f_number')?.value || '',
+    client:   clientOpt?.dataset.name || '',
+    clientEmail: clientOpt?.dataset.email || '',
+    clientAddr:  clientOpt?.dataset.address || '',
+    due:      document.getElementById('f_due')?.value || '',
+    currency: document.getElementById('f_currency')?.value || 'USD',
+    notes:    document.getElementById('f_notes')?.value || '',
+    payment:  document.getElementById('f_payment')?.value || '',
+    rows,
+    total: rows.reduce((s,r) => s+r.t, 0),
+  };
+}
+
+// ── Render preview HTML ───────────────────────────────────────────────────
+function renderPreview(s, theme) {
+  const T = THEMES[theme] || THEMES.minimal;
+  const isGrad = T.header.includes('gradient');
+  const headerStyle = isGrad
+    ? `background:${T.header};`
+    : `background:${T.header}; border-bottom:3px solid ${T.accent};`;
+  const headTxtColor = (theme==='bold'||isGrad) ? '#fff' : T.text;
+  const subTxtColor  = (theme==='bold'||isGrad) ? 'rgba(255,255,255,0.7)' : T.sub;
+  const logoHtml = LOGO ? `<img src="${LOGO}" style="max-height:56px;max-width:140px;object-fit:contain;"/>` : '';
+  const bizHtml = `
+    <div style="font-size:1.1rem;font-weight:700;color:${headTxtColor}">${BIZ||'Your Business'}</div>
+    ${BIZ_REG ? `<div style="font-size:.7rem;color:${subTxtColor}">Reg: ${BIZ_REG}</div>` : ''}
+    ${BIZ_ADDR ? `<div style="font-size:.7rem;color:${subTxtColor}">${BIZ_ADDR.replace(/\n/g,'<br>')}</div>` : ''}
+    ${BIZ_EMAIL ? `<div style="font-size:.7rem;color:${subTxtColor}">${BIZ_EMAIL}</div>` : ''}
+  `;
+  const rowsHtml = s.rows.length ? s.rows.map(r=>`
+    <tr>
+      <td style="padding:.6rem .5rem;color:${T.text};border-bottom:1px solid ${T.border}">${r.d}</td>
+      <td style="padding:.6rem .5rem;text-align:center;color:${T.sub};border-bottom:1px solid ${T.border}">${r.q}</td>
+      <td style="padding:.6rem .5rem;text-align:right;color:${T.sub};border-bottom:1px solid ${T.border}">${r.p.toFixed(2)}</td>
+      <td style="padding:.6rem .5rem;text-align:right;font-weight:600;color:${T.text};border-bottom:1px solid ${T.border}">${r.t.toFixed(2)}</td>
+    </tr>`).join('') : `<tr><td colspan="4" style="padding:1rem;text-align:center;color:${T.sub}">Add line items above…</td></tr>`;
+
+  const payHtml = s.payment ? `
+    <div style="margin-top:1.5rem;padding:1rem;background:#f8fafc;border-radius:.5rem;border:1px solid ${T.border}">
+      <div style="font-size:.65rem;font-weight:700;color:${T.sub};text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem">Payment Details</div>
+      <div style="font-size:.75rem;color:${T.text};white-space:pre-line">${s.payment}</div>
+    </div>` : '';
+
+  return `
+  <div style="background:${T.bg};font-family:'Segoe UI',system-ui,sans-serif;min-height:600px;">
+    <!-- Header -->
+    <div style="${headerStyle}padding:1.5rem 2rem;display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>${logoHtml || ''}<div style="margin-top:${LOGO?'.5rem':'0'}">${bizHtml}</div></div>
+      <div style="text-align:right">
+        <div style="font-size:1.5rem;font-weight:800;color:${headTxtColor}">INVOICE</div>
+        <div style="font-size:.9rem;font-weight:600;color:${T.accent};margin-top:.25rem">${s.number||'INV-0001'}</div>
+        ${s.due?`<div style="font-size:.7rem;color:${subTxtColor};margin-top:.25rem">Due: ${s.due}</div>`:''}
+      </div>
+    </div>
+    <!-- Bill to -->
+    <div style="padding:1.25rem 2rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem;border-bottom:1px solid ${T.border}">
+      <div>
+        <div style="font-size:.65rem;font-weight:700;color:${T.sub};text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem">Bill To</div>
+        <div style="font-weight:600;color:${T.text}">${s.client||'Client Name'}</div>
+        ${s.clientEmail?`<div style="font-size:.75rem;color:${T.sub}">${s.clientEmail}</div>`:''}
+        ${s.clientAddr?`<div style="font-size:.75rem;color:${T.sub}">${s.clientAddr.replace(/\n/g,'<br>')}</div>`:''}
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:.65rem;font-weight:700;color:${T.sub};text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem">Currency</div>
+        <div style="font-weight:600;color:${T.text}">${s.currency}</div>
+      </div>
+    </div>
+    <!-- Line items -->
+    <div style="padding:1.25rem 2rem">
+      <table style="width:100%;border-collapse:collapse;font-size:.8rem">
+        <thead>
+          <tr style="border-bottom:2px solid ${T.accent}">
+            <th style="text-align:left;padding:.4rem .5rem;color:${T.sub};font-size:.65rem;text-transform:uppercase">Description</th>
+            <th style="text-align:center;padding:.4rem .5rem;color:${T.sub};font-size:.65rem;text-transform:uppercase;width:50px">Qty</th>
+            <th style="text-align:right;padding:.4rem .5rem;color:${T.sub};font-size:.65rem;text-transform:uppercase;width:80px">Price</th>
+            <th style="text-align:right;padding:.4rem .5rem;color:${T.sub};font-size:.65rem;text-transform:uppercase;width:80px">Total</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" style="padding:.8rem .5rem;text-align:right;font-weight:700;color:${T.sub}">TOTAL</td>
+            <td style="padding:.8rem .5rem;text-align:right;font-size:1.2rem;font-weight:800;color:${T.accent}">${s.currency} ${s.total.toFixed(2)}</td>
+          </tr>
+        </tfoot>
+      </table>
+      ${s.notes?`<div style="margin-top:1rem;font-size:.75rem;color:${T.sub};font-style:italic">${s.notes}</div>`:''}
+      ${payHtml}
+    </div>
+    <div style="margin:0 2rem 2rem;padding-top:1rem;border-top:1px solid ${T.border};text-align:center;font-size:.65rem;color:${T.sub}">
+      Thank you for your business
+    </div>
+  </div>`;
+}
+
+// ── Main preview refresh ──────────────────────────────────────────────────
+function preview() {
+  const s = getState();
+  document.getElementById('previewWrap').innerHTML = renderPreview(s, currentTheme);
+  // Update grand total in form
+  let sum = 0;
+  document.querySelectorAll('.row-total').forEach(el => sum += parseFloat(el.textContent)||0);
+  document.getElementById('grand').textContent = sum.toFixed(2);
+}
+
+// ── Row helpers ───────────────────────────────────────────────────────────
+function calcRow(inp) {
+  const row = inp.closest('.row');
+  const q = parseFloat(row.querySelector('[name="quantity[]"]').value)||0;
+  const p = parseFloat(row.querySelector('[name="unit_price[]"]').value)||0;
+  row.querySelector('.row-total').textContent = (q*p).toFixed(2);
+  updateGrand();
+}
+
+function updateGrand() {
+  let s=0; document.querySelectorAll('.row-total').forEach(e=>s+=parseFloat(e.textContent)||0);
+  document.getElementById('grand').textContent=s.toFixed(2);
+}
+
+function addRow() {
+  const div=document.createElement('div');
+  div.className='row grid grid-cols-12 gap-1 items-center';
+  div.innerHTML=`
+    <input name="description[]" type="text" oninput="calcRow(this);preview()" placeholder="Service description" class="col-span-12 sm:col-span-6 input text-sm"/>
+    <input name="quantity[]" type="number" step="0.01" min="0" value="1" oninput="calcRow(this);preview()" class="col-span-4 sm:col-span-2 input text-sm text-center"/>
+    <input name="unit_price[]" type="number" step="0.01" min="0" value="0" oninput="calcRow(this);preview()" class="col-span-5 sm:col-span-2 input text-sm text-right"/>
+    <div class="col-span-3 sm:col-span-2 flex items-center justify-end gap-1">
+      <span class="row-total text-sm font-semibold text-slate-700 min-w-[50px] text-right">0.00</span>
+      <button type="button" onclick="removeRow(this)" class="text-slate-300 hover:text-red-500 text-lg ml-1 leading-none">&times;</button>
+    </div>`;
+  document.getElementById('rows').appendChild(div);
+  div.querySelector('input').focus();
+}
+
+function removeRow(btn) {
+  if(document.querySelectorAll('.row').length<=1) return;
+  btn.closest('.row').remove();
+  updateGrand(); preview();
+}
+
+function submitForm() { document.getElementById('invoiceForm').submit(); }
+
+// Init
+window.addEventListener('DOMContentLoaded', () => { applyTemplate(currentTheme); preview(); });
 </script>
 {% endblock %}

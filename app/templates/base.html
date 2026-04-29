@@ -55,6 +55,11 @@
                 {% if '/expenses' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800 hover:text-white{% endif %}">
         <i class="fas fa-receipt w-4 text-center"></i> Expenses
       </a>
+      <a href="/profile/"
+         class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                {% if '/profile' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800 hover:text-white{% endif %}">
+        <i class="fas fa-user-circle w-4 text-center"></i> My Profile
+      </a>
       <a href="/reports/"
          class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
                 {% if '/reports' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800 hover:text-white{% endif %}">
