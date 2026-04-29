@@ -2,12 +2,13 @@
 auth.py — Authentication logic and routes.
 
 Uses:
-  - passlib[bcrypt] for password hashing
+  - bcrypt for password hashing
   - python-jose for JWT token creation/verification
   - httpOnly cookies to store the token (not accessible via JS → XSS protection)
 """
 import os
 from datetime import datetime, timedelta
+from typing import Optional
 
 import bcrypt
 from fastapi import APIRouter, Depends, Request
@@ -28,25 +29,19 @@ ALGORITHM   = "HS256"
 COOKIE_NAME = "access_token"
 TOKEN_EXPIRE_DAYS = 7
 
-# ── Password hashing (using bcrypt directly for Python 3.12 compatibility) ───
+# ── Password hashing ──────────────────────────────────────────────────────────
 def verify_password(plain: str, hashed: str) -> bool:
-    """Verify a plain-text password against a bcrypt hash."""
     return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
-
 def hash_password(plain: str) -> str:
-    """Hash a plain-text password with bcrypt and return as string."""
-    hashed = bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt(rounds=12))
-    return hashed.decode("utf-8")
-
+    return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode("utf-8")
 
 # ── JWT helpers ───────────────────────────────────────────────────────────────
 def create_token(user_id: int) -> str:
     expire = datetime.utcnow() + timedelta(days=TOKEN_EXPIRE_DAYS)
     return jwt.encode({"sub": str(user_id), "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
 
-
-def decode_token(token: str) -> int | None:
+def decode_token(token: str) -> Optional[int]:
     """Return user_id from token, or None if invalid/expired."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -54,9 +49,8 @@ def decode_token(token: str) -> int | None:
     except (JWTError, TypeError, ValueError):
         return None
 
-
 # ── Current user helpers ──────────────────────────────────────────────────────
-def get_current_user(request: Request, db: Session) -> User | None:
+def get_current_user(request: Request, db: Session) -> Optional[User]:
     """Read JWT from cookie and return the User object, or None."""
     token = request.cookies.get(COOKIE_NAME)
     if not token:
@@ -66,25 +60,20 @@ def get_current_user(request: Request, db: Session) -> User | None:
         return None
     return db.query(User).filter(User.id == user_id).first()
 
-
 def require_user(request: Request, db: Session = Depends(get_db)) -> User:
     """Dependency that redirects to /login if not authenticated."""
     user = get_current_user(request, db)
     if not user:
-        # Raise a redirect — caller must handle RedirectResponse
         raise _AuthRedirect()
     return user
 
-
 class _AuthRedirect(Exception):
     """Sentinel to signal an unauthenticated request."""
-
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
-
 
 @router.post("/login", response_class=HTMLResponse)
 async def login_submit(request: Request, db: Session = Depends(get_db)):
@@ -106,11 +95,9 @@ async def login_submit(request: Request, db: Session = Depends(get_db)):
     )
     return response
 
-
 @router.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
     return templates.TemplateResponse("register.html", {"request": request})
-
 
 @router.post("/register", response_class=HTMLResponse)
 async def register_submit(request: Request, db: Session = Depends(get_db)):
@@ -119,7 +106,6 @@ async def register_submit(request: Request, db: Session = Depends(get_db)):
     password = form.get("password", "")
     confirm  = form.get("confirm_password", "")
 
-    # Basic validation
     if len(email) < 3 or "@" not in email:
         return templates.TemplateResponse(
             "register.html", {"request": request, "error": "Please enter a valid email."}
@@ -148,7 +134,6 @@ async def register_submit(request: Request, db: Session = Depends(get_db)):
         httponly=True, max_age=TOKEN_EXPIRE_DAYS * 86_400, samesite="lax"
     )
     return response
-
 
 @router.get("/logout")
 async def logout():
