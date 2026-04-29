@@ -1,6 +1,5 @@
 """
-database.py — SQLAlchemy engine, session factory, and Base class.
-Supports SQLite (local) and PostgreSQL/Supabase (production).
+database.py — SQLAlchemy engine supporting SQLite (dev) and PostgreSQL/Supabase (prod).
 """
 import os
 from sqlalchemy import create_engine
@@ -10,7 +9,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./tax_invoice.db")
-
 _is_sqlite = DATABASE_URL.startswith("sqlite")
 
 if _is_sqlite:
@@ -19,13 +17,19 @@ if _is_sqlite:
         connect_args={"check_same_thread": False},
     )
 else:
-    # Add connect_timeout so a bad connection fails fast instead of hanging 30s
-    connect_args = {"connect_timeout": 10}
+    # Supabase connection pooler settings (port 6543)
+    # sslmode=require is mandatory for Supabase pooler
+    connect_args = {
+        "connect_timeout": 10,
+        "sslmode": "require",
+        "keepalives": 1,
+        "keepalives_idle": 30,
+    }
     engine = create_engine(
         DATABASE_URL,
         connect_args=connect_args,
-        pool_size=5,
-        max_overflow=10,
+        pool_size=3,
+        max_overflow=5,
         pool_pre_ping=True,
         pool_recycle=300,
     )
