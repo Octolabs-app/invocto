@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Clients — Tax-Ready Invoice{% endblock %}
+{% block page_title %}Clients{% endblock %}
+
+{% block header_actions %}
+  <button onclick="document.getElementById('addClientModal').classList.remove('hidden')"
+          class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
+    <i class="fas fa-plus"></i> Add Client
+  </button>
+{% endblock %}
+
+{% block content %}
+
+{% if request.query_params.get('need_client') %}
+<div class="mb-5 flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-3 text-sm">
+  <i class="fas fa-triangle-exclamation"></i>
+  Please add a client before creating an invoice.
+</div>
+{% endif %}
+
+{% if success %}
+<div class="mb-5 flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm">
+  <i class="fas fa-circle-check"></i>
+  Client {{ "added" if success == "added" else "updated" }} successfully.
+</div>
+{% endif %}
+
+<!-- ── Client list ─────────────────────────────────────────────────────────── -->
+{% if clients %}
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-50 border-b border-slate-200">
+      <tr>
+        <th class="text-left px-5 py-3 font-semibold text-slate-600">Name</th>
+        <th class="text-left px-5 py-3 font-semibold text-slate-600 hidden md:table-cell">Email</th>
+        <th class="text-left px-5 py-3 font-semibold text-slate-600 hidden lg:table-cell">Phone</th>
+        <th class="text-right px-5 py-3 font-semibold text-slate-600">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for client in clients %}
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="px-5 py-3 font-medium text-slate-800">{{ client.name }}</td>
+        <td class="px-5 py-3 text-slate-500 hidden md:table-cell">{{ client.email or "—" }}</td>
+        <td class="px-5 py-3 text-slate-500 hidden lg:table-cell">{{ client.phone or "—" }}</td>
+        <td class="px-5 py-3 text-right space-x-2">
+          <a href="/clients/{{ client.id }}/edit"
+             class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-xs font-medium">
+            <i class="fas fa-pen-to-square"></i> Edit
+          </a>
+          <form method="POST" action="/clients/{{ client.id }}/delete" class="inline"
+                onsubmit="return confirm('Delete {{ client.name }}? This cannot be undone.')">
+            <button type="submit"
+                    class="text-red-500 hover:text-red-700 text-xs font-medium">
+              <i class="fas fa-trash"></i> Delete
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="text-center py-20 text-slate-400">
+  <p class="text-5xl mb-3">👤</p>
+  <p class="text-lg font-medium">No clients yet</p>
+  <p class="text-sm mt-1">Add your first client to get started.</p>
+</div>
+{% endif %}
+
+
+<!-- ── Add Client Modal ────────────────────────────────────────────────────── -->
+<div id="addClientModal"
+     class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="text-lg font-bold text-slate-800">Add New Client</h3>
+      <button onclick="document.getElementById('addClientModal').classList.add('hidden')"
+              class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+    </div>
+    <form method="POST" action="/clients/add" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Name <span class="text-red-500">*</span></label>
+        <input name="name" required type="text"
+               class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="Acme Corp" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+        <input name="email" type="email"
+               class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="contact@acme.com" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+        <input name="phone" type="tel"
+               class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="+1 555 0100" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Address</label>
+        <textarea name="address" rows="2"
+                  class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="123 Main St, City, Country"></textarea>
+      </div>
+      <div class="flex gap-3 pt-1">
+        <button type="button"
+                onclick="document.getElementById('addClientModal').classList.add('hidden')"
+                class="flex-1 border border-slate-300 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+          Cancel
+        </button>
+        <button type="submit"
+                class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors">
+          Add Client
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Edit Client Modal ───────────────────────────────────────────────────── -->
+{% if edit_client %}
+<div id="editClientModal"
+     class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="text-lg font-bold text-slate-800">Edit Client</h3>
+      <a href="/clients/" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</a>
+    </div>
+    <form method="POST" action="/clients/{{ edit_client.id }}/edit" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Name <span class="text-red-500">*</span></label>
+        <input name="name" required type="text" value="{{ edit_client.name }}"
+               class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+        <input name="email" type="email" value="{{ edit_client.email or '' }}"
+               class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+        <input name="phone" type="tel" value="{{ edit_client.phone or '' }}"
+               class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Address</label>
+        <textarea name="address" rows="2"
+                  class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">{{ edit_client.address or '' }}</textarea>
+      </div>
+      <div class="flex gap-3 pt-1">
+        <a href="/clients/"
+           class="flex-1 border border-slate-300 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 text-center">
+          Cancel
+        </a>
+        <button type="submit"
+                class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors">
+          Save Changes
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

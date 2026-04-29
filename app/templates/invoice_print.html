@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ invoice.invoice_number }} — Invoice</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white !important; }
+      .print-card { box-shadow: none !important; border: none !important; }
+    }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen py-10 px-4">
+
+<!-- ── Toolbar (hidden when printing) ──────────────────────────────────────── -->
+<div class="no-print flex items-center justify-between max-w-3xl mx-auto mb-6">
+  <a href="/invoices/" class="text-indigo-600 hover:underline text-sm flex items-center gap-1">
+    ← Back to Invoices
+  </a>
+  <button onclick="window.print()"
+          class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-5 py-2.5 rounded-lg flex items-center gap-2">
+    🖨️ Print / Save as PDF
+  </button>
+</div>
+
+<!-- ── Invoice document ─────────────────────────────────────────────────────── -->
+<div class="print-card max-w-3xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
+
+  <!-- Header -->
+  <div class="bg-indigo-700 text-white px-10 py-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <p class="text-indigo-200 text-xs uppercase tracking-widest font-semibold mb-1">Invoice</p>
+      <p class="text-3xl font-bold tracking-tight">{{ invoice.invoice_number }}</p>
+    </div>
+    <div class="text-right">
+      <p class="text-sm font-semibold">📄 Tax-Ready Invoice</p>
+      <p class="text-indigo-200 text-sm mt-1">{{ user.email }}</p>
+      {% if invoice.status == "paid" %}
+      <span class="inline-block mt-2 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full tracking-wide">
+        PAID
+      </span>
+      {% else %}
+      <span class="inline-block mt-2 bg-amber-400 text-white text-xs font-bold px-3 py-1 rounded-full tracking-wide">
+        UNPAID
+      </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Meta info grid -->
+  <div class="px-10 py-6 grid grid-cols-2 sm:grid-cols-3 gap-6 border-b border-slate-200">
+    <div>
+      <p class="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-1">Bill To</p>
+      <p class="font-semibold text-slate-800">{{ invoice.client.name }}</p>
+      {% if invoice.client.email %}
+      <p class="text-sm text-slate-500">{{ invoice.client.email }}</p>
+      {% endif %}
+      {% if invoice.client.address %}
+      <p class="text-sm text-slate-500 whitespace-pre-line">{{ invoice.client.address }}</p>
+      {% endif %}
+      {% if invoice.client.phone %}
+      <p class="text-sm text-slate-500">{{ invoice.client.phone }}</p>
+      {% endif %}
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-1">Invoice Date</p>
+      <p class="text-slate-800 font-medium">{{ invoice.created_at.strftime('%B %d, %Y') }}</p>
+
+      <p class="text-xs text-slate-500 font-semibold uppercase tracking-wide mt-4 mb-1">Due Date</p>
+      <p class="text-slate-800 font-medium">{{ invoice.due_date.strftime('%B %d, %Y') }}</p>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-1">Currency</p>
+      <p class="text-slate-800 font-medium">{{ invoice.currency }}</p>
+
+      <p class="text-xs text-slate-500 font-semibold uppercase tracking-wide mt-4 mb-1">Category</p>
+      <p class="text-slate-800 font-medium">{{ invoice.category }}</p>
+
+      {% if invoice.payment_date %}
+      <p class="text-xs text-slate-500 font-semibold uppercase tracking-wide mt-4 mb-1">Payment Date</p>
+      <p class="text-emerald-600 font-medium">{{ invoice.payment_date.strftime('%B %d, %Y') }}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Line items table -->
+  <div class="px-10 py-6">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b-2 border-slate-200">
+          <th class="text-left pb-3 font-semibold text-slate-600">Description</th>
+          <th class="text-center pb-3 font-semibold text-slate-600 w-20">Qty</th>
+          <th class="text-right pb-3 font-semibold text-slate-600 w-28">Unit Price</th>
+          <th class="text-right pb-3 font-semibold text-slate-600 w-28">Total</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for item in invoice.line_items %}
+        <tr>
+          <td class="py-3 text-slate-700">{{ item.description }}</td>
+          <td class="py-3 text-center text-slate-500">{{ item.quantity }}</td>
+          <td class="py-3 text-right text-slate-600">{{ "%.2f"|format(item.unit_price) }}</td>
+          <td class="py-3 text-right font-semibold text-slate-800">{{ "%.2f"|format(item.line_total) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="border-t-2 border-slate-800">
+          <td colspan="3" class="pt-4 text-right font-bold text-slate-700 text-base">Total Due</td>
+          <td class="pt-4 text-right font-bold text-2xl text-indigo-700">
+            {{ invoice.currency }} {{ "%.2f"|format(invoice.total) }}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <!-- Notes -->
+  {% if invoice.notes %}
+  <div class="px-10 pb-6">
+    <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Notes</p>
+      <p class="text-sm text-slate-600 whitespace-pre-line">{{ invoice.notes }}</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Footer -->
+  <div class="bg-slate-50 border-t border-slate-200 px-10 py-4 text-center">
+    <p class="text-xs text-slate-400">
+      Generated by Tax-Ready Invoice · {{ invoice.created_at.strftime('%Y') }}
+    </p>
+  </div>
+
+</div>
+
+</body>
+</html>

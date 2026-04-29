@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Tax Reports — Tax-Ready Invoice{% endblock %}
+{% block page_title %}Tax Reports{% endblock %}
+
+{% block header_actions %}
+  <a href="/reports/download-csv?year={{ year }}"
+     class="border border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
+    <i class="fas fa-download"></i> Download CSV
+  </a>
+  <a href="/reports/print?year={{ year }}" target="_blank"
+     class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
+    <i class="fas fa-print"></i> Print / PDF
+  </a>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Year picker ──────────────────────────────────────────────────────────── -->
+<div class="flex items-center gap-3 mb-6">
+  <span class="text-sm font-medium text-slate-600">Tax Year:</span>
+  <div class="flex gap-2 flex-wrap">
+    {% for y in year_range %}
+    <a href="/reports/?year={{ y }}"
+       class="px-4 py-1.5 rounded-full text-sm font-medium border transition-colors
+              {% if y == year %}bg-indigo-600 text-white border-indigo-600{% else %}border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-700{% endif %}">
+      {{ y }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ── Disclaimer ─────────────────────────────────────────────────────────── -->
+<div class="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-3 text-sm mb-6">
+  <i class="fas fa-triangle-exclamation mt-0.5 shrink-0"></i>
+  <div>
+    <strong>Estimate only.</strong> The 25% tax rate is a rough guideline for self-employed freelancers.
+    Your actual tax liability depends on your location, deductions, and tax bracket.
+    Please consult a qualified tax professional.
+    Multi-currency invoices are excluded from this report — convert them manually and add them to your figures.
+  </div>
+</div>
+
+<!-- ── Summary cards ──────────────────────────────────────────────────────── -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Total Income</p>
+    <p class="text-2xl font-bold text-emerald-600">${{ "%.2f"|format(total_income) }}</p>
+    <p class="text-xs text-slate-400 mt-1">Paid USD invoices</p>
+  </div>
+
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Total Expenses</p>
+    <p class="text-2xl font-bold text-slate-700">${{ "%.2f"|format(total_expenses) }}</p>
+    <p class="text-xs text-slate-400 mt-1">Deductible costs</p>
+  </div>
+
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Net Income</p>
+    <p class="text-2xl font-bold {% if net_income >= 0 %}text-indigo-700{% else %}text-red-500{% endif %}">
+      ${{ "%.2f"|format(net_income) }}
+    </p>
+    <p class="text-xs text-slate-400 mt-1">Income − expenses</p>
+  </div>
+
+  <div class="bg-red-50 rounded-xl border border-red-200 shadow-sm p-5">
+    <p class="text-xs font-semibold text-red-400 uppercase tracking-wide mb-1">Est. Tax (25%)</p>
+    <p class="text-2xl font-bold text-red-600">${{ "%.2f"|format(estimated_tax) }}</p>
+    <p class="text-xs text-red-400 mt-1">Set this aside!</p>
+  </div>
+
+</div>
+
+<!-- ── Quarterly breakdown ─────────────────────────────────────────────────── -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+    <h3 class="font-semibold text-slate-700 mb-4">
+      Income by Quarter — {{ year }}
+    </h3>
+    <div class="space-y-3">
+      {% set q_months = {1: "Jan–Mar", 2: "Apr–Jun", 3: "Jul–Sep", 4: "Oct–Dec"} %}
+      {% for q in range(1, 5) %}
+      <div class="flex items-center gap-3">
+        <div class="w-16 shrink-0">
+          <p class="text-xs font-bold text-slate-600">Q{{ q }}</p>
+          <p class="text-xs text-slate-400">{{ q_months[q] }}</p>
+        </div>
+        <!-- Progress bar -->
+        <div class="flex-1 bg-slate-100 rounded-full h-3 overflow-hidden">
+          {% if total_income > 0 %}
+          <div class="h-3 rounded-full bg-indigo-500 transition-all duration-500"
+               style="width: {{ (quarterly[q] / total_income * 100) | round | int }}%"></div>
+          {% else %}
+          <div class="h-3 rounded-full bg-slate-200" style="width:0%"></div>
+          {% endif %}
+        </div>
+        <p class="text-sm font-semibold text-slate-800 w-24 text-right shrink-0">
+          ${{ "%.2f"|format(quarterly[q]) }}
+        </p>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="mt-4 pt-4 border-t border-slate-200 flex justify-between">
+      <span class="text-sm font-semibold text-slate-600">Annual Total</span>
+      <span class="text-sm font-bold text-slate-800">${{ "%.2f"|format(total_income) }}</span>
+    </div>
+  </div>
+
+  <!-- Expenses by category -->
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+    <h3 class="font-semibold text-slate-700 mb-4">Expenses by Category — {{ year }}</h3>
+    {% set cat_totals = {} %}
+    {% for e in expenses %}
+      {% if e.category in cat_totals %}
+        {# Jinja2 workaround for dict mutation #}
+      {% endif %}
+    {% endfor %}
+
+    {% if expenses %}
+    {% set ns = namespace(cat_totals={}) %}
+    {% for e in expenses %}
+      {% set cur = ns.cat_totals.get(e.category, 0) %}
+      {% set _ = ns.cat_totals.update({e.category: cur + e.amount}) %}
+    {% endfor %}
+
+    <div class="space-y-3">
+      {% for cat, amt in ns.cat_totals.items()|sort(attribute='1', reverse=True) %}
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-indigo-400 inline-block"></span>
+          <span class="text-sm text-slate-700">{{ cat }}</span>
+        </div>
+        <span class="text-sm font-semibold text-slate-800">${{ "%.2f"|format(amt) }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="mt-4 pt-4 border-t border-slate-200 flex justify-between">
+      <span class="text-sm font-semibold text-slate-600">Total Expenses</span>
+      <span class="text-sm font-bold text-slate-800">${{ "%.2f"|format(total_expenses) }}</span>
+    </div>
+    {% else %}
+    <p class="text-slate-400 text-sm py-6 text-center">No expenses recorded for {{ year }}.</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- ── Paid invoices table ─────────────────────────────────────────────────── -->
+{% if paid_invoices %}
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+  <div class="px-6 py-4 border-b border-slate-200">
+    <h3 class="font-semibold text-slate-700">Paid Invoices — {{ year }}</h3>
+    <p class="text-xs text-slate-400 mt-0.5">Used in CSV export. Multi-currency invoices shown with their original currency.</p>
+  </div>
+  <div class="overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-50">
+      <tr>
+        <th class="text-left px-5 py-3 font-semibold text-slate-600">Date Paid</th>
+        <th class="text-left px-5 py-3 font-semibold text-slate-600">Invoice #</th>
+        <th class="text-left px-5 py-3 font-semibold text-slate-600">Client</th>
+        <th class="text-left px-5 py-3 font-semibold text-slate-600">Category</th>
+        <th class="text-right px-5 py-3 font-semibold text-slate-600">Amount</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for inv in paid_invoices %}
+      <tr class="hover:bg-slate-50">
+        <td class="px-5 py-3 text-slate-500">{{ inv.payment_date.strftime('%b %d, %Y') if inv.payment_date else "—" }}</td>
+        <td class="px-5 py-3 font-mono text-xs text-slate-500">{{ inv.invoice_number }}</td>
+        <td class="px-5 py-3 font-medium text-slate-800">{{ inv.client.name }}</td>
+        <td class="px-5 py-3">
+          <span class="bg-indigo-50 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">{{ inv.category }}</span>
+        </td>
+        <td class="px-5 py-3 text-right font-semibold
+                   {% if inv.currency != 'USD' %}text-slate-400{% else %}text-slate-800{% endif %}">
+          {{ inv.currency }} {{ "%.2f"|format(inv.total) }}
+          {% if inv.currency != 'USD' %}
+          <span class="text-xs text-slate-400 block font-normal">(convert manually)</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% else %}
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm p-10 text-center text-slate-400">
+  <p class="text-3xl mb-2">📭</p>
+  <p class="text-sm">No paid invoices found for {{ year }}.</p>
+</div>
+{% endif %}
+
+{% endblock %}

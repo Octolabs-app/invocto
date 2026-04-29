@@ -1,0 +1,16 @@
+# Environment variables — NEVER commit
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+
+# Database (local dev only)
+*.db
+
+# OS
+.DS_Store
+Thumbs.db
