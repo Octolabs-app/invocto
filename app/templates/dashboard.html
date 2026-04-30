@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block title %}Dashboard — Tax-Ready Invoice{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 
@@ -15,73 +14,68 @@
 <!-- ── Summary cards ──────────────────────────────────────────────────────── -->
 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
 
-  <!-- Earned (USD) -->
+  <!-- Total Earned -->
   <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-    <div class="flex items-start justify-between">
-      <div>
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Earned</p>
-        <p class="text-2xl font-bold text-emerald-600 mt-1">
-          ${{ "%.2f"|format(paid_totals.get("USD", 0)) }}
-        </p>
-        {% if paid_totals|length > 1 or (paid_totals|length == 1 and "USD" not in paid_totals) %}
-        <div class="mt-1 text-xs text-slate-400 space-y-0.5">
-          {% for cur, amt in paid_totals.items() %}{% if cur != "USD" %}
-          <div>{{ cur }} {{ "%.2f"|format(amt) }}</div>
-          {% endif %}{% endfor %}
-        </div>
-        {% endif %}
-      </div>
-      <div class="bg-emerald-100 text-emerald-600 rounded-lg p-2.5 text-lg">💰</div>
+    <div class="flex items-start justify-between mb-3">
+      <p class="text-xs font-bold text-slate-500 uppercase tracking-wide">Total Earned</p>
+      <div class="bg-emerald-100 text-emerald-600 rounded-lg p-2 text-sm">💰</div>
     </div>
-    <p class="text-xs text-slate-400 mt-3">Paid invoices (all time)</p>
+    {% if paid_totals %}
+      {% for cur, amt in paid_totals.items() %}
+      <p class="text-{{ '2xl' if loop.first else 'sm' }} font-bold text-emerald-600 {% if not loop.first %}mt-1{% endif %}">
+        {{ cur }} {{ "%.2f"|format(amt) }}
+      </p>
+      {% endfor %}
+    {% else %}
+      <p class="text-2xl font-bold text-slate-300">—</p>
+    {% endif %}
+    <p class="text-xs text-slate-400 mt-2">Paid invoices (all time)</p>
   </div>
 
   <!-- Pending -->
   <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-    <div class="flex items-start justify-between">
-      <div>
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Pending</p>
-        <p class="text-2xl font-bold text-amber-500 mt-1">
-          ${{ "%.2f"|format(pending_totals.get("USD", 0)) }}
-        </p>
-        {% for cur, amt in pending_totals.items() %}{% if cur != "USD" %}
-        <div class="text-xs text-slate-400">{{ cur }} {{ "%.2f"|format(amt) }}</div>
-        {% endif %}{% endfor %}
-      </div>
-      <div class="bg-amber-100 text-amber-500 rounded-lg p-2.5 text-lg">⏳</div>
+    <div class="flex items-start justify-between mb-3">
+      <p class="text-xs font-bold text-slate-500 uppercase tracking-wide">Pending</p>
+      <div class="bg-amber-100 text-amber-500 rounded-lg p-2 text-sm">⏳</div>
     </div>
-    <p class="text-xs text-slate-400 mt-3">Awaiting payment</p>
+    {% if pending_totals %}
+      {% for cur, amt in pending_totals.items() %}
+      <p class="text-{{ '2xl' if loop.first else 'sm' }} font-bold text-amber-500 {% if not loop.first %}mt-1{% endif %}">
+        {{ cur }} {{ "%.2f"|format(amt) }}
+      </p>
+      {% endfor %}
+    {% else %}
+      <p class="text-2xl font-bold text-slate-300">—</p>
+    {% endif %}
+    <p class="text-xs text-slate-400 mt-2">Awaiting payment</p>
   </div>
 
   <!-- Overdue -->
   <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-    <div class="flex items-start justify-between">
-      <div>
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Overdue</p>
-        <p class="text-2xl font-bold text-red-500 mt-1">
-          ${{ "%.2f"|format(overdue_totals.get("USD", 0)) }}
-        </p>
-        {% for cur, amt in overdue_totals.items() %}{% if cur != "USD" %}
-        <div class="text-xs text-slate-400">{{ cur }} {{ "%.2f"|format(amt) }}</div>
-        {% endif %}{% endfor %}
-      </div>
-      <div class="bg-red-100 text-red-500 rounded-lg p-2.5 text-lg">🚨</div>
+    <div class="flex items-start justify-between mb-3">
+      <p class="text-xs font-bold text-slate-500 uppercase tracking-wide">Overdue</p>
+      <div class="bg-red-100 text-red-500 rounded-lg p-2 text-sm">🚨</div>
     </div>
-    <p class="text-xs text-slate-400 mt-3">Past due date</p>
+    {% if overdue_totals %}
+      {% for cur, amt in overdue_totals.items() %}
+      <p class="text-{{ '2xl' if loop.first else 'sm' }} font-bold text-red-500 {% if not loop.first %}mt-1{% endif %}">
+        {{ cur }} {{ "%.2f"|format(amt) }}
+      </p>
+      {% endfor %}
+    {% else %}
+      <p class="text-2xl font-bold text-slate-300">—</p>
+    {% endif %}
+    <p class="text-xs text-slate-400 mt-2">Past due date</p>
   </div>
 
   <!-- Expenses -->
   <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-    <div class="flex items-start justify-between">
-      <div>
-        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Expenses {{ current_year }}</p>
-        <p class="text-2xl font-bold text-slate-700 mt-1">
-          ${{ "%.2f"|format(total_expenses) }}
-        </p>
-      </div>
-      <div class="bg-slate-100 text-slate-600 rounded-lg p-2.5 text-lg">🧾</div>
+    <div class="flex items-start justify-between mb-3">
+      <p class="text-xs font-bold text-slate-500 uppercase tracking-wide">Expenses {{ current_year }}</p>
+      <div class="bg-slate-100 text-slate-500 rounded-lg p-2 text-sm">🧾</div>
     </div>
-    <p class="text-xs text-slate-400 mt-3">Business expenses this year</p>
+    <p class="text-2xl font-bold text-slate-700">${{ "%.2f"|format(total_expenses) }}</p>
+    <p class="text-xs text-slate-400 mt-2">Business expenses this year</p>
   </div>
 
 </div>
@@ -89,7 +83,6 @@
 <!-- ── Chart + Recent invoices ─────────────────────────────────────────────── -->
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
-  <!-- Monthly income chart -->
   <div class="xl:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
     <h3 class="font-semibold text-slate-700 mb-4">
       Monthly Income (USD) — {{ current_year }}
@@ -109,72 +102,67 @@
       {% for inv in recent_invoices %}
       <li class="flex items-start justify-between gap-2">
         <div class="min-w-0">
-          <p class="text-sm font-medium text-slate-800 truncate">{{ inv.client.name }}</p>
+          <p class="text-sm font-semibold text-slate-800 truncate">{{ inv.client.name }}</p>
           <p class="text-xs text-slate-400">{{ inv.invoice_number }}</p>
         </div>
         <div class="text-right shrink-0">
-          <p class="text-sm font-semibold text-slate-800">
-            {{ inv.currency }} {{ "%.2f"|format(inv.total) }}
-          </p>
+          <p class="text-sm font-bold text-slate-800">{{ inv.currency }} {{ "%.2f"|format(inv.total) }}</p>
           {% if inv.status == "paid" %}
-          <span class="text-xs bg-emerald-100 text-emerald-700 rounded px-1.5 py-0.5">Paid</span>
+          <span class="text-xs bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5 font-medium">Paid</span>
           {% elif inv.is_overdue %}
-          <span class="text-xs bg-red-100 text-red-700 rounded px-1.5 py-0.5">Overdue</span>
+          <span class="text-xs bg-red-100 text-red-700 rounded-full px-2 py-0.5 font-medium">Overdue</span>
           {% else %}
-          <span class="text-xs bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">Pending</span>
+          <span class="text-xs bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 font-medium">Pending</span>
           {% endif %}
         </div>
       </li>
       {% endfor %}
     </ul>
     {% else %}
-    <div class="text-center py-8 text-slate-400">
-      <p class="text-3xl mb-2">📋</p>
+    <div class="text-center py-10 text-slate-400">
+      <p class="text-4xl mb-2">📋</p>
       <p class="text-sm">No invoices yet</p>
-      <a href="/invoices/new" class="mt-3 inline-block text-indigo-600 text-sm hover:underline">
-        Create your first invoice →
-      </a>
+      <a href="/invoices/new" class="mt-2 inline-block text-indigo-500 text-sm hover:underline">Create your first →</a>
     </div>
     {% endif %}
   </div>
 
-</div><!-- end grid -->
-
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  // Fetch monthly income data from API and render Chart.js bar chart
-  fetch("/api/monthly-income")
-    .then(r => r.json())
-    .then(data => {
-      const ctx = document.getElementById("incomeChart").getContext("2d");
-      new Chart(ctx, {
-        type: "bar",
-        data: {
-          labels: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
-          datasets: [{
-            label: "Income (USD)",
-            data: data.months,
-            backgroundColor: "rgba(99,102,241,0.7)",
-            borderColor:     "rgba(99,102,241,1)",
-            borderWidth: 1,
-            borderRadius: 4,
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: {
-              beginAtZero: true,
-              ticks: {
-                callback: v => "$" + v.toLocaleString()
-              }
-            }
-          }
+fetch("/api/monthly-income")
+  .then(r => r.json())
+  .then(data => {
+    const ctx = document.getElementById("incomeChart").getContext("2d");
+    new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
+        datasets: [{
+          label: "USD Income",
+          data: data.months,
+          backgroundColor: "rgba(99,102,241,0.75)",
+          borderColor: "#6366f1",
+          borderWidth: 1,
+          borderRadius: 5,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { callback: v => "$" + v.toLocaleString() },
+            grid: { color: "#f1f5f9" }
+          },
+          x: { grid: { display: false } }
         }
-      });
+      }
     });
+  });
 </script>
 {% endblock %}

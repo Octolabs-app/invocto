@@ -1,8 +1,8 @@
 """
-dashboard.py — Main dashboard view and the /api/monthly-income JSON endpoint
-used by Chart.js to render the bar chart.
+dashboard.py — Main dashboard and /api/monthly-income JSON endpoint.
 """
 from datetime import date
+from collections import defaultdict
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -25,44 +25,43 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     today        = date.today()
     current_year = today.year
 
-    # ── Load all user invoices ───────────────────────────────────────────────
-    invoices = db.query(Invoice).filter(Invoice.user_id == user.id).all()
+    invoices = db.query(Invoice).filter(
+        Invoice.user_id == user.id,
+        Invoice.is_template == False
+    ).all()
 
-    # Build per-currency totals for paid, pending, overdue
-    paid_totals    = {}   # currency → float
-    pending_totals = {}
-    overdue_totals = {}
+    # Totals grouped by currency
+    paid_totals    = defaultdict(float)
+    pending_totals = defaultdict(float)
+    overdue_totals = defaultdict(float)
 
     for inv in invoices:
         t = inv.total
         c = inv.currency
         if inv.status == "paid":
-            paid_totals[c] = paid_totals.get(c, 0.0) + t
+            paid_totals[c] += t
         else:
-            pending_totals[c] = pending_totals.get(c, 0.0) + t
+            pending_totals[c] += t
             if inv.due_date < today:
-                overdue_totals[c] = overdue_totals.get(c, 0.0) + t
+                overdue_totals[c] += t
 
-    # ── Expenses for current year ────────────────────────────────────────────
-    year_start = date(current_year, 1, 1)
-    year_end   = date(current_year, 12, 31)
-    expenses   = db.query(Expense).filter(
+    # Expenses this year
+    expenses = db.query(Expense).filter(
         Expense.user_id == user.id,
-        Expense.date    >= year_start,
-        Expense.date    <= year_end,
+        Expense.date    >= date(current_year, 1, 1),
+        Expense.date    <= date(current_year, 12, 31),
     ).all()
     total_expenses = sum(e.amount for e in expenses)
 
-    # ── Recent invoices (last 5 by creation date) ────────────────────────────
     recent = sorted(invoices, key=lambda i: i.created_at, reverse=True)[:5]
 
     return templates.TemplateResponse("dashboard.html", {
         "request":        request,
         "user":           user,
         "today":          today,
-        "paid_totals":    paid_totals,
-        "pending_totals": pending_totals,
-        "overdue_totals": overdue_totals,
+        "paid_totals":    dict(paid_totals),
+        "pending_totals": dict(pending_totals),
+        "overdue_totals": dict(overdue_totals),
         "total_expenses": total_expenses,
         "recent_invoices": recent,
         "current_year":   current_year,
@@ -71,12 +70,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/api/monthly-income")
 async def monthly_income(request: Request, db: Session = Depends(get_db)):
-    """
-    Returns monthly income totals for the current year (paid invoices only).
-    Used by Chart.js on the dashboard.
-
-    Response: { "months": [jan, feb, ..., dec] }  (12 floats, USD only)
-    """
+    """Monthly USD income for Chart.js bar chart."""
     user = get_current_user(request, db)
     if not user:
         return JSONResponse({"error": "Not authenticated"}, status_code=401)
@@ -85,13 +79,14 @@ async def monthly_income(request: Request, db: Session = Depends(get_db)):
     monthly = [0.0] * 12
 
     invoices = db.query(Invoice).filter(
-        Invoice.user_id == user.id,
-        Invoice.status  == "paid",
+        Invoice.user_id    == user.id,
+        Invoice.status     == "paid",
+        Invoice.currency   == "USD",
+        Invoice.is_template == False,
     ).all()
 
     for inv in invoices:
-        # Only count USD invoices in the chart for clarity
-        if inv.payment_date and inv.payment_date.year == current_year and inv.currency == "USD":
+        if inv.payment_date and inv.payment_date.year == current_year:
             monthly[inv.payment_date.month - 1] += inv.total
 
     return JSONResponse({"months": monthly, "year": current_year})

@@ -3,20 +3,21 @@
 {% block page_title %}{{ "Edit " + invoice.invoice_number if invoice else "Create Invoice" }}{% endblock %}
 
 {% block header_actions %}
-<button onclick="submitForm()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2 rounded-lg flex items-center gap-2">
+<button onclick="document.getElementById('invoiceForm').submit()"
+        class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2 rounded-lg flex items-center gap-2 transition-colors">
   <i class="fas fa-save"></i> {{ "Save Changes" if invoice else "Create Invoice" }}
 </button>
 {% endblock %}
 
 {% block content %}
-<div class="flex gap-6 h-full" style="min-height:calc(100vh - 120px)">
+<div class="flex gap-6" style="min-height:calc(100vh - 130px)">
 
-  <!-- ── LEFT: Form ──────────────────────────────────────────────────────── -->
-  <div class="w-full xl:w-1/2 space-y-4 overflow-y-auto pb-8">
+  <!-- ── LEFT: Form panel ───────────────────────────────────────────────── -->
+  <div class="w-full xl:w-[52%] space-y-4 overflow-y-auto pb-10">
   <form id="invoiceForm" method="POST"
         action="{{ '/invoices/' + invoice.id|string + '/edit' if invoice else '/invoices/new' }}">
 
-    <!-- Basic details -->
+    <!-- Step 1: Invoice Details -->
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
       <h3 class="font-semibold text-slate-700 mb-4 flex items-center gap-2">
         <span class="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">1</span>
@@ -24,100 +25,118 @@
       </h3>
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="label">Invoice #</label>
-          <input name="invoice_number" id="f_number" type="text"
+          <label class="flabel">Invoice #</label>
+          <input name="invoice_number" id="f_number" type="text" oninput="schedulePreview()"
                  value="{{ invoice.invoice_number if invoice else next_number }}"
                  {% if invoice %}readonly{% endif %}
-                 oninput="preview()"
-                 class="input {% if invoice %}bg-slate-50 text-slate-400{% endif %}"/>
+                 class="finput {% if invoice %}bg-slate-50 text-slate-400 cursor-default{% endif %}"/>
         </div>
         <div>
-          <label class="label">Client <span class="text-red-400">*</span></label>
-          <select name="client_id" id="f_client" onchange="preview()" class="input bg-white">
+          <label class="flabel">Client <span class="text-red-400">*</span></label>
+          <select name="client_id" id="f_client" onchange="schedulePreview()" required class="finput bg-white">
             {% for c in clients %}
-            <option value="{{ c.id }}" data-name="{{ c.name }}" data-email="{{ c.email or '' }}" data-address="{{ c.address or '' }}"
-              {% if invoice and invoice.client_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+            <option value="{{ c.id }}"
+                    data-name="{{ c.name | e }}"
+                    data-email="{{ c.email or '' | e }}"
+                    data-address="{{ (c.address or '') | replace('\n', '\\n') | e }}"
+                    {% if invoice and invoice.client_id == c.id %}selected{% endif %}>{{ c.name }}</option>
             {% endfor %}
           </select>
         </div>
         <div>
-          <label class="label">Due Date <span class="text-red-400">*</span></label>
-          <input name="due_date" id="f_due" type="date" required oninput="preview()"
+          <label class="flabel">Due Date <span class="text-red-400">*</span></label>
+          <input name="due_date" id="f_due" type="date" required oninput="schedulePreview()"
                  value="{{ invoice.due_date.isoformat() if invoice else '' }}"
-                 class="input"/>
+                 class="finput"/>
         </div>
         <div>
-          <label class="label">Currency</label>
-          <select name="currency" id="f_currency" onchange="preview()" class="input bg-white">
+          <label class="flabel">Currency</label>
+          <select name="currency" id="f_currency" onchange="schedulePreview()" class="finput bg-white">
             {% for cur in currencies %}
-            <option value="{{ cur }}" {% if invoice and invoice.currency == cur %}selected{% elif not invoice and cur == "USD" %}selected{% endif %}>{{ cur }}</option>
+            <option value="{{ cur }}" {% if (invoice and invoice.currency == cur) or (not invoice and cur == "USD") %}selected{% endif %}>{{ cur }}</option>
             {% endfor %}
           </select>
         </div>
         <div>
-          <label class="label">Template</label>
-          <select name="template" id="f_template" onchange="applyTemplate(this.value); preview();" class="input bg-white">
-            <option value="minimal"  {% if (invoice and invoice.template == 'minimal')  or (profile and profile.invoice_template == 'minimal')  %}selected{% endif %}>Minimal</option>
-            <option value="bold"     {% if (invoice and invoice.template == 'bold')     or (profile and profile.invoice_template == 'bold')     %}selected{% endif %}>Bold</option>
-            <option value="creative" {% if (invoice and invoice.template == 'creative') or (profile and profile.invoice_template == 'creative') %}selected{% endif %}>Creative</option>
+          <label class="flabel">Template</label>
+          <select name="template" id="f_template" onchange="currentTheme=this.value; schedulePreview();" class="finput bg-white">
+            <option value="minimal"  {% if invoice and invoice.template == 'minimal'  %}selected{% elif profile and profile.invoice_template == 'minimal'  %}selected{% elif not invoice and not profile %}selected{% endif %}>✦ Minimal</option>
+            <option value="bold"     {% if invoice and invoice.template == 'bold'     %}selected{% elif profile and profile.invoice_template == 'bold'     %}selected{% endif %}>◆ Bold</option>
+            <option value="creative" {% if invoice and invoice.template == 'creative' %}selected{% elif profile and profile.invoice_template == 'creative' %}selected{% endif %}>◈ Creative</option>
           </select>
         </div>
         {% if invoice %}
         <div>
-          <label class="label">Category</label>
-          <select name="category" onchange="preview()" class="input bg-white">
+          <label class="flabel">Category <span class="text-xs text-indigo-400 font-normal">(AI suggested)</span></label>
+          <select name="category" onchange="schedulePreview()" class="finput bg-white">
             {% for cat in categories %}
             <option value="{{ cat }}" {% if invoice.category == cat %}selected{% endif %}>{{ cat }}</option>
             {% endfor %}
           </select>
         </div>
+        {% else %}
+        <input type="hidden" name="category" value="Other">
         {% endif %}
       </div>
     </div>
 
-    <!-- Line items -->
+    <!-- Step 2: Line Items -->
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
       <div class="flex items-center justify-between mb-3">
         <h3 class="font-semibold text-slate-700 flex items-center gap-2">
           <span class="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">2</span>
           Line Items
         </h3>
-        <button type="button" onclick="addRow()" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center gap-1">
+        <button type="button" onclick="addRow()"
+                class="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 text-sm font-medium">
           <i class="fas fa-plus-circle"></i> Add Row
         </button>
       </div>
-      <div class="grid grid-cols-12 gap-1 text-xs font-semibold text-slate-400 uppercase mb-1 px-1 hidden sm:grid">
-        <div class="col-span-6">Description</div><div class="col-span-2 text-center">Qty</div>
-        <div class="col-span-2 text-right">Price</div><div class="col-span-2 text-right">Total</div>
+      <div class="hidden sm:grid grid-cols-12 gap-1 text-xs font-semibold text-slate-400 uppercase mb-1 px-1">
+        <div class="col-span-6">Description</div>
+        <div class="col-span-2 text-center">Qty</div>
+        <div class="col-span-2 text-right">Price</div>
+        <div class="col-span-2 text-right">Total</div>
       </div>
       <div id="rows" class="space-y-2">
         {% if invoice and invoice.line_items %}
           {% for item in invoice.line_items %}
           <div class="row grid grid-cols-12 gap-1 items-center">
-            <input name="description[]" type="text" value="{{ item.description }}" oninput="calcRow(this);preview()" placeholder="Service…" class="col-span-12 sm:col-span-6 input text-sm"/>
-            <input name="quantity[]"    type="number" step="0.01" min="0" value="{{ item.quantity }}" oninput="calcRow(this);preview()" class="col-span-4 sm:col-span-2 input text-sm text-center"/>
-            <input name="unit_price[]"  type="number" step="0.01" min="0" value="{{ item.unit_price }}" oninput="calcRow(this);preview()" class="col-span-5 sm:col-span-2 input text-sm text-right"/>
+            <input name="description[]" type="text" value="{{ item.description }}"
+                   oninput="calcRow(this); schedulePreview()" placeholder="Service description"
+                   class="col-span-12 sm:col-span-6 finput text-sm"/>
+            <input name="quantity[]" type="number" step="0.01" min="0" value="{{ item.quantity }}"
+                   oninput="calcRow(this); schedulePreview()"
+                   class="col-span-4 sm:col-span-2 finput text-sm text-center"/>
+            <input name="unit_price[]" type="number" step="0.01" min="0" value="{{ item.unit_price }}"
+                   oninput="calcRow(this); schedulePreview()"
+                   class="col-span-5 sm:col-span-2 finput text-sm text-right"/>
             <div class="col-span-3 sm:col-span-2 flex items-center justify-end gap-1">
               <span class="row-total text-sm font-semibold text-slate-700 min-w-[50px] text-right">{{ "%.2f"|format(item.line_total) }}</span>
-              <button type="button" onclick="removeRow(this)" class="text-slate-300 hover:text-red-500 text-lg ml-1 leading-none">&times;</button>
+              <button type="button" onclick="removeRow(this)" class="text-slate-300 hover:text-red-500 text-lg ml-1">&times;</button>
             </div>
           </div>
           {% endfor %}
         {% else %}
           <div class="row grid grid-cols-12 gap-1 items-center">
-            <input name="description[]" type="text" oninput="calcRow(this);preview()" placeholder="e.g. Logo Design" class="col-span-12 sm:col-span-6 input text-sm"/>
-            <input name="quantity[]"    type="number" step="0.01" min="0" value="1" oninput="calcRow(this);preview()" class="col-span-4 sm:col-span-2 input text-sm text-center"/>
-            <input name="unit_price[]"  type="number" step="0.01" min="0" value="0" oninput="calcRow(this);preview()" class="col-span-5 sm:col-span-2 input text-sm text-right"/>
+            <input name="description[]" type="text" oninput="calcRow(this); schedulePreview()" placeholder="e.g. Logo Design"
+                   class="col-span-12 sm:col-span-6 finput text-sm"/>
+            <input name="quantity[]" type="number" step="0.01" min="0" value="1"
+                   oninput="calcRow(this); schedulePreview()"
+                   class="col-span-4 sm:col-span-2 finput text-sm text-center"/>
+            <input name="unit_price[]" type="number" step="0.01" min="0" value="0"
+                   oninput="calcRow(this); schedulePreview()"
+                   class="col-span-5 sm:col-span-2 finput text-sm text-right"/>
             <div class="col-span-3 sm:col-span-2 flex items-center justify-end gap-1">
               <span class="row-total text-sm font-semibold text-slate-700 min-w-[50px] text-right">0.00</span>
-              <button type="button" onclick="removeRow(this)" class="text-slate-300 hover:text-red-500 text-lg ml-1 leading-none">&times;</button>
+              <button type="button" onclick="removeRow(this)" class="text-slate-300 hover:text-red-500 text-lg ml-1">&times;</button>
             </div>
           </div>
         {% endif %}
       </div>
       <div class="flex justify-end mt-3 pt-3 border-t border-slate-200">
         <div class="text-right">
-          <p class="text-xs text-slate-400 uppercase font-semibold">Total</p>
+          <p class="text-xs text-slate-400 uppercase font-semibold tracking-wide">Invoice Total</p>
           <p id="grand" class="text-2xl font-bold text-indigo-700">
             {% if invoice %}{{ "%.2f"|format(invoice.total) }}{% else %}0.00{% endif %}
           </p>
@@ -125,55 +144,64 @@
       </div>
     </div>
 
-    <!-- Notes & Payment -->
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-      <h3 class="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+    <!-- Step 3: Notes & Payment -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
+      <h3 class="font-semibold text-slate-700 flex items-center gap-2">
         <span class="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">3</span>
         Notes & Payment Info
       </h3>
-      <div class="space-y-3">
-        <div>
-          <label class="label">Notes to Client</label>
-          <textarea name="notes" id="f_notes" rows="2" oninput="preview()"
-                    class="input" placeholder="Payment terms, project details…">{{ invoice.notes if invoice else "" }}</textarea>
-        </div>
-        <div>
-          <label class="label">Payment Instructions</label>
-          <textarea name="payment_note" id="f_payment" rows="3" oninput="preview()"
-                    class="input" placeholder="Bank: Barclays&#10;Account: 1234 5678&#10;Sort: 00-00-00&#10;PayPal: you@email.com">{{ invoice.payment_note if invoice else (profile.payment_instructions if profile else "") }}</textarea>
-        </div>
+      <div>
+        <label class="flabel">Notes to Client</label>
+        <textarea name="notes" id="f_notes" rows="2" oninput="schedulePreview()"
+                  class="finput" placeholder="Payment terms, thank you message…">{{ invoice.notes if invoice else "" }}</textarea>
+      </div>
+      <div>
+        <label class="flabel">Payment Instructions <span class="text-slate-400 font-normal text-xs">(bank / PayPal / crypto)</span></label>
+        <textarea name="payment_note" id="f_payment" rows="4" oninput="schedulePreview()"
+                  class="finput font-mono text-xs"
+                  placeholder="Bank: Barclays&#10;Account: 12345678&#10;Sort: 00-00-00&#10;PayPal: you@email.com">{{ invoice.payment_note if invoice else (profile.payment_instructions if profile and profile.payment_instructions else "") }}</textarea>
       </div>
     </div>
 
-    <!-- Save as template -->
+    <!-- Step 4: Save as template -->
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
       <h3 class="font-semibold text-slate-700 mb-3 flex items-center gap-2">
         <span class="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">4</span>
-        Save as Template (optional)
+        Save as Template <span class="text-xs text-slate-400 font-normal">(optional)</span>
       </h3>
-      <div class="flex items-center gap-3">
+      <label class="flex items-center gap-3 cursor-pointer">
         <input type="checkbox" name="save_as_template" id="save_tmpl" class="w-4 h-4 accent-indigo-600"
-               onchange="document.getElementById('tmpl_name_wrap').style.display=this.checked?'block':'none'"
+               onchange="document.getElementById('tmpl_name_wrap').classList.toggle('hidden', !this.checked)"
                {% if invoice and invoice.is_template %}checked{% endif %}>
-        <label for="save_tmpl" class="text-sm text-slate-600">Save this invoice as a reusable template</label>
-      </div>
+        <span class="text-sm text-slate-600">Save this invoice as a reusable template</span>
+      </label>
       <div id="tmpl_name_wrap" class="mt-2 {% if not (invoice and invoice.is_template) %}hidden{% endif %}">
-        <input name="template_name" type="text" class="input"
+        <input name="template_name" type="text" class="finput"
                value="{{ invoice.template_name if invoice else '' }}"
                placeholder="e.g. Standard Web Design Invoice"/>
       </div>
     </div>
 
-    <input type="hidden" name="category" value="{{ invoice.category if invoice else 'Other' }}">
   </form>
   </div>
 
-  <!-- ── RIGHT: Live Preview ─────────────────────────────────────────────── -->
-  <div class="hidden xl:block xl:w-1/2 sticky top-0 self-start pt-0">
-    <div class="bg-slate-200 rounded-2xl p-4 overflow-hidden" style="height:calc(100vh - 140px); overflow-y:auto;">
-      <p class="text-xs text-slate-500 text-center mb-3 font-medium tracking-wide uppercase">Live Preview</p>
-      <div id="previewWrap" class="bg-white rounded-xl shadow-xl overflow-hidden transform scale-90 origin-top" style="min-height:600px;">
-        <!-- Injected by JS -->
+  <!-- ── RIGHT: Live Preview ────────────────────────────────────────────── -->
+  <div class="hidden xl:flex xl:w-[48%] flex-col sticky top-0 self-start" style="height:calc(100vh - 130px)">
+    <div class="bg-slate-100 rounded-2xl flex flex-col h-full overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-2.5 border-b border-slate-200">
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest">Live Preview</p>
+        <div class="flex gap-1.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-red-400"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-yellow-400"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-green-400"></span>
+        </div>
+      </div>
+      <div class="flex-1 overflow-y-auto p-3">
+        <div id="previewWrap"
+             class="bg-white rounded-xl shadow-lg overflow-hidden origin-top"
+             style="min-height:500px; font-size:13px;">
+          <!-- Rendered by JS -->
+        </div>
       </div>
     </div>
   </div>
@@ -183,187 +211,212 @@
 
 {% block scripts %}
 <style>
-  .label { @apply block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide; }
-  .input { @apply w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 transition; }
-  label.label { display:block; font-size:.7rem; font-weight:600; color:#64748b; margin-bottom:.25rem; text-transform:uppercase; letter-spacing:.05em; }
-  .input { width:100%; border:1px solid #e2e8f0; border-radius:.5rem; padding:.6rem .75rem; font-size:.875rem; outline:none; transition:box-shadow .15s; }
-  .input:focus { box-shadow:0 0 0 2px #818cf8; border-color:#818cf8; }
+  .flabel { display:block; font-size:.68rem; font-weight:700; color:#64748b; margin-bottom:.3rem; text-transform:uppercase; letter-spacing:.06em; }
+  .finput  { width:100%; border:1px solid #e2e8f0; border-radius:.5rem; padding:.6rem .75rem; font-size:.875rem; outline:none; transition:box-shadow .12s, border-color .12s; background:white; }
+  .finput:focus { box-shadow:0 0 0 2px #a5b4fc; border-color:#818cf8; }
   #tmpl_name_wrap.hidden { display:none; }
 </style>
 
 <script>
-// ── Data from server ──────────────────────────────────────────────────────
-const LOGO    = {{ ('"' + profile.logo_base64 + '"') | safe if profile and profile.logo_base64 else 'null' }};
-const BIZ     = {{ ('"' + (profile.business_name or '') + '"') | safe if profile else '""' }};
-const BIZ_REG = {{ ('"' + (profile.business_reg_number or '') + '"') | safe if profile else '""' }};
-const BIZ_ADDR= {{ ('"' + (profile.business_address or '').replace('\n','\\n') + '"') | safe if profile else '""' }};
-const BIZ_EMAIL={{ ('"' + (profile.business_email or '') + '"') | safe if profile else '""' }};
-
-// ── Template colour schemes ───────────────────────────────────────────────
-const THEMES = {
-  minimal:  { bg:'#ffffff', header:'#f8fafc', accent:'#6366f1', text:'#1e293b', sub:'#64748b', border:'#e2e8f0' },
-  bold:     { bg:'#ffffff', header:'#0f172a', accent:'#f59e0b', text:'#1e293b', sub:'#64748b', border:'#e2e8f0' },
-  creative: { bg:'#ffffff', header:'linear-gradient(135deg,#6366f1,#8b5cf6)', accent:'#6366f1', text:'#1e293b', sub:'#64748b', border:'#e8e3ff' },
+// ── Safe data from server (JSON-encoded to avoid escaping issues) ──────────
+const SERVER = {
+  logo:    {{ (profile.logo_base64 | tojson) if profile and profile.logo_base64 else 'null' }},
+  biz:     {{ ((profile.business_name or '') | tojson) if profile else '""' }},
+  regNum:  {{ ((profile.business_reg_number or '') | tojson) if profile else '""' }},
+  addr:    {{ ((profile.business_address or '') | tojson) if profile else '""' }},
+  email:   {{ ((profile.business_email or '') | tojson) if profile else '""' }},
+  theme:   {{ ((invoice.template if invoice else (profile.invoice_template if profile else 'minimal')) | tojson) }},
 };
-let currentTheme = '{{ (invoice.template if invoice else (profile.invoice_template if profile else "minimal")) }}';
 
-function applyTemplate(t) { currentTheme = t; preview(); }
+let currentTheme = SERVER.theme;
+let previewTimer = null;
 
-// ── Collect form state ────────────────────────────────────────────────────
+// ── Theme palette ─────────────────────────────────────────────────────────
+const THEMES = {
+  minimal:  { headerBg:'#f8fafc', headerBorder:'3px solid #6366f1', headTxt:'#1e293b', headSub:'#64748b', accent:'#6366f1', body:'#fff', row:'#f8fafc', border:'#e2e8f0', txt:'#1e293b', sub:'#64748b' },
+  bold:     { headerBg:'#0f172a', headerBorder:'none',              headTxt:'#fff',     headSub:'rgba(255,255,255,.55)', accent:'#f59e0b', body:'#fff', row:'#fffbeb', border:'#e2e8f0', txt:'#1e293b', sub:'#475569' },
+  creative: { headerBg:'linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%)', headerBorder:'none', headTxt:'#fff', headSub:'rgba(255,255,255,.65)', accent:'#8b5cf6', body:'#fff', row:'#f5f3ff', border:'#ede9fe', txt:'#1e293b', sub:'#6b7280' },
+};
+
+// ── Collect form values ───────────────────────────────────────────────────
 function getState() {
   const rows = [];
   document.querySelectorAll('#rows .row').forEach(r => {
-    const d = r.querySelector('[name="description[]"]')?.value || '';
+    const d = r.querySelector('[name="description[]"]')?.value?.trim() || '';
     const q = parseFloat(r.querySelector('[name="quantity[]"]')?.value) || 0;
     const p = parseFloat(r.querySelector('[name="unit_price[]"]')?.value) || 0;
-    if (d) rows.push({d, q, p, t: q*p});
+    if (d) rows.push({ d, q, p, t: +(q * p).toFixed(2) });
   });
-
-  const clientOpt = document.querySelector('#f_client option:checked');
+  const opt = document.querySelector('#f_client option:checked');
   return {
-    number:   document.getElementById('f_number')?.value || '',
-    client:   clientOpt?.dataset.name || '',
-    clientEmail: clientOpt?.dataset.email || '',
-    clientAddr:  clientOpt?.dataset.address || '',
+    number:   (document.getElementById('f_number')?.value || '').trim(),
+    client:   opt?.dataset?.name    || '',
+    cEmail:   opt?.dataset?.email   || '',
+    cAddr:    opt?.dataset?.address || '',
     due:      document.getElementById('f_due')?.value || '',
     currency: document.getElementById('f_currency')?.value || 'USD',
-    notes:    document.getElementById('f_notes')?.value || '',
-    payment:  document.getElementById('f_payment')?.value || '',
+    notes:    document.getElementById('f_notes')?.value?.trim() || '',
+    payment:  document.getElementById('f_payment')?.value?.trim() || '',
     rows,
-    total: rows.reduce((s,r) => s+r.t, 0),
+    total: +(rows.reduce((s, r) => s + r.t, 0)).toFixed(2),
   };
 }
 
-// ── Render preview HTML ───────────────────────────────────────────────────
-function renderPreview(s, theme) {
-  const T = THEMES[theme] || THEMES.minimal;
-  const isGrad = T.header.includes('gradient');
+// ── Build preview HTML ────────────────────────────────────────────────────
+function buildPreview(s, themeName) {
+  const T = THEMES[themeName] || THEMES.minimal;
+  const isGrad = T.headerBg.includes('gradient');
   const headerStyle = isGrad
-    ? `background:${T.header};`
-    : `background:${T.header}; border-bottom:3px solid ${T.accent};`;
-  const headTxtColor = (theme==='bold'||isGrad) ? '#fff' : T.text;
-  const subTxtColor  = (theme==='bold'||isGrad) ? 'rgba(255,255,255,0.7)' : T.sub;
-  const logoHtml = LOGO ? `<img src="${LOGO}" style="max-height:56px;max-width:140px;object-fit:contain;"/>` : '';
-  const bizHtml = `
-    <div style="font-size:1.1rem;font-weight:700;color:${headTxtColor}">${BIZ||'Your Business'}</div>
-    ${BIZ_REG ? `<div style="font-size:.7rem;color:${subTxtColor}">Reg: ${BIZ_REG}</div>` : ''}
-    ${BIZ_ADDR ? `<div style="font-size:.7rem;color:${subTxtColor}">${BIZ_ADDR.replace(/\n/g,'<br>')}</div>` : ''}
-    ${BIZ_EMAIL ? `<div style="font-size:.7rem;color:${subTxtColor}">${BIZ_EMAIL}</div>` : ''}
+    ? `background:${T.headerBg};`
+    : `background:${T.headerBg}; border-bottom:${T.headerBorder};`;
+
+  const logoHtml = SERVER.logo
+    ? `<img src="${SERVER.logo}" style="max-height:48px;max-width:120px;object-fit:contain;display:block;margin-bottom:6px;">`
+    : '';
+
+  const bizBlock = `
+    <div style="font-size:.95rem;font-weight:700;color:${T.headTxt};margin-bottom:2px;">${esc(SERVER.biz || 'Your Business')}</div>
+    ${ SERVER.regNum ? `<div style="font-size:.65rem;color:${T.headSub};">Reg / VAT: ${esc(SERVER.regNum)}</div>` : '' }
+    ${ SERVER.addr   ? `<div style="font-size:.65rem;color:${T.headSub};">${esc(SERVER.addr).replace(/\n/g,'<br>')}</div>` : '' }
+    ${ SERVER.email  ? `<div style="font-size:.65rem;color:${T.headSub};">${esc(SERVER.email)}</div>` : '' }
   `;
-  const rowsHtml = s.rows.length ? s.rows.map(r=>`
-    <tr>
-      <td style="padding:.6rem .5rem;color:${T.text};border-bottom:1px solid ${T.border}">${r.d}</td>
-      <td style="padding:.6rem .5rem;text-align:center;color:${T.sub};border-bottom:1px solid ${T.border}">${r.q}</td>
-      <td style="padding:.6rem .5rem;text-align:right;color:${T.sub};border-bottom:1px solid ${T.border}">${r.p.toFixed(2)}</td>
-      <td style="padding:.6rem .5rem;text-align:right;font-weight:600;color:${T.text};border-bottom:1px solid ${T.border}">${r.t.toFixed(2)}</td>
-    </tr>`).join('') : `<tr><td colspan="4" style="padding:1rem;text-align:center;color:${T.sub}">Add line items above…</td></tr>`;
+
+  const rowsHtml = s.rows.length
+    ? s.rows.map((r,i) => `
+      <tr style="background:${i%2===0?'#fff':T.row}">
+        <td style="padding:.45rem .5rem;border-bottom:1px solid ${T.border};color:${T.txt};">${esc(r.d)}</td>
+        <td style="padding:.45rem .5rem;text-align:center;border-bottom:1px solid ${T.border};color:${T.sub};">${r.q}</td>
+        <td style="padding:.45rem .5rem;text-align:right;border-bottom:1px solid ${T.border};color:${T.sub};">${r.p.toFixed(2)}</td>
+        <td style="padding:.45rem .5rem;text-align:right;border-bottom:1px solid ${T.border};font-weight:600;color:${T.txt};">${r.t.toFixed(2)}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="4" style="padding:1.5rem;text-align:center;color:${T.sub};font-style:italic;">Add line items on the left…</td></tr>`;
 
   const payHtml = s.payment ? `
-    <div style="margin-top:1.5rem;padding:1rem;background:#f8fafc;border-radius:.5rem;border:1px solid ${T.border}">
-      <div style="font-size:.65rem;font-weight:700;color:${T.sub};text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem">Payment Details</div>
-      <div style="font-size:.75rem;color:${T.text};white-space:pre-line">${s.payment}</div>
+    <div style="margin-top:14px;padding:10px 12px;background:${T.row};border-radius:6px;border:1px solid ${T.border};">
+      <div style="font-size:.6rem;font-weight:700;color:${T.sub};text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Payment Details</div>
+      <div style="font-size:.7rem;color:${T.txt};white-space:pre-line;font-family:monospace;">${esc(s.payment)}</div>
     </div>` : '';
 
   return `
-  <div style="background:${T.bg};font-family:'Segoe UI',system-ui,sans-serif;min-height:600px;">
-    <!-- Header -->
-    <div style="${headerStyle}padding:1.5rem 2rem;display:flex;justify-content:space-between;align-items:flex-start;">
-      <div>${logoHtml || ''}<div style="margin-top:${LOGO?'.5rem':'0'}">${bizHtml}</div></div>
-      <div style="text-align:right">
-        <div style="font-size:1.5rem;font-weight:800;color:${headTxtColor}">INVOICE</div>
-        <div style="font-size:.9rem;font-weight:600;color:${T.accent};margin-top:.25rem">${s.number||'INV-0001'}</div>
-        ${s.due?`<div style="font-size:.7rem;color:${subTxtColor};margin-top:.25rem">Due: ${s.due}</div>`:''}
-      </div>
+<div style="background:${T.body};font-family:'Segoe UI',system-ui,sans-serif;">
+
+  <!-- Header -->
+  <div style="${headerStyle}padding:20px 24px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+    <div>${logoHtml}${bizBlock}</div>
+    <div style="text-align:right;flex-shrink:0;">
+      <div style="font-size:1.3rem;font-weight:900;letter-spacing:-.02em;color:${T.headTxt};">INVOICE</div>
+      <div style="font-size:.85rem;font-weight:700;color:${T.accent};margin-top:2px;">${esc(s.number || 'INV-XXXX')}</div>
+      ${ s.due ? `<div style="font-size:.65rem;color:${T.headSub};margin-top:3px;">Due: ${s.due}</div>` : '' }
     </div>
-    <!-- Bill to -->
-    <div style="padding:1.25rem 2rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem;border-bottom:1px solid ${T.border}">
-      <div>
-        <div style="font-size:.65rem;font-weight:700;color:${T.sub};text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem">Bill To</div>
-        <div style="font-weight:600;color:${T.text}">${s.client||'Client Name'}</div>
-        ${s.clientEmail?`<div style="font-size:.75rem;color:${T.sub}">${s.clientEmail}</div>`:''}
-        ${s.clientAddr?`<div style="font-size:.75rem;color:${T.sub}">${s.clientAddr.replace(/\n/g,'<br>')}</div>`:''}
-      </div>
-      <div style="text-align:right">
-        <div style="font-size:.65rem;font-weight:700;color:${T.sub};text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem">Currency</div>
-        <div style="font-weight:600;color:${T.text}">${s.currency}</div>
-      </div>
+  </div>
+
+  <!-- Bill To -->
+  <div style="padding:14px 24px;display:grid;grid-template-columns:1fr 1fr;gap:12px;border-bottom:1px solid ${T.border};">
+    <div>
+      <div style="font-size:.6rem;font-weight:700;color:${T.sub};text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Bill To</div>
+      <div style="font-weight:700;color:${T.txt};font-size:.85rem;">${esc(s.client || '— select client —')}</div>
+      ${ s.cEmail ? `<div style="font-size:.7rem;color:${T.sub};">${esc(s.cEmail)}</div>` : '' }
+      ${ s.cAddr  ? `<div style="font-size:.7rem;color:${T.sub};">${esc(s.cAddr).replace(/\n/g,'<br>')}</div>` : '' }
     </div>
-    <!-- Line items -->
-    <div style="padding:1.25rem 2rem">
-      <table style="width:100%;border-collapse:collapse;font-size:.8rem">
-        <thead>
-          <tr style="border-bottom:2px solid ${T.accent}">
-            <th style="text-align:left;padding:.4rem .5rem;color:${T.sub};font-size:.65rem;text-transform:uppercase">Description</th>
-            <th style="text-align:center;padding:.4rem .5rem;color:${T.sub};font-size:.65rem;text-transform:uppercase;width:50px">Qty</th>
-            <th style="text-align:right;padding:.4rem .5rem;color:${T.sub};font-size:.65rem;text-transform:uppercase;width:80px">Price</th>
-            <th style="text-align:right;padding:.4rem .5rem;color:${T.sub};font-size:.65rem;text-transform:uppercase;width:80px">Total</th>
-          </tr>
-        </thead>
-        <tbody>${rowsHtml}</tbody>
-        <tfoot>
-          <tr>
-            <td colspan="3" style="padding:.8rem .5rem;text-align:right;font-weight:700;color:${T.sub}">TOTAL</td>
-            <td style="padding:.8rem .5rem;text-align:right;font-size:1.2rem;font-weight:800;color:${T.accent}">${s.currency} ${s.total.toFixed(2)}</td>
-          </tr>
-        </tfoot>
-      </table>
-      ${s.notes?`<div style="margin-top:1rem;font-size:.75rem;color:${T.sub};font-style:italic">${s.notes}</div>`:''}
-      ${payHtml}
+    <div style="text-align:right;">
+      <div style="font-size:.6rem;font-weight:700;color:${T.sub};text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Currency</div>
+      <div style="font-weight:700;color:${T.accent};font-size:.85rem;">${s.currency}</div>
     </div>
-    <div style="margin:0 2rem 2rem;padding-top:1rem;border-top:1px solid ${T.border};text-align:center;font-size:.65rem;color:${T.sub}">
-      Thank you for your business
-    </div>
-  </div>`;
+  </div>
+
+  <!-- Line items table -->
+  <div style="padding:14px 24px;">
+    <table style="width:100%;border-collapse:collapse;font-size:.78rem;">
+      <thead>
+        <tr style="border-bottom:2px solid ${T.accent};">
+          <th style="text-align:left;padding:.35rem .5rem;color:${T.sub};font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Description</th>
+          <th style="text-align:center;padding:.35rem .5rem;color:${T.sub};font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;width:42px;">Qty</th>
+          <th style="text-align:right;padding:.35rem .5rem;color:${T.sub};font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;width:70px;">Price</th>
+          <th style="text-align:right;padding:.35rem .5rem;color:${T.sub};font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;width:70px;">Total</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3" style="padding:.75rem .5rem;text-align:right;font-weight:700;font-size:.75rem;color:${T.sub};letter-spacing:.04em;">TOTAL DUE</td>
+          <td style="padding:.75rem .5rem;text-align:right;font-size:1.1rem;font-weight:900;color:${T.accent};">${s.currency} ${s.total.toFixed(2)}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    ${ s.notes ? `<div style="margin-top:10px;font-size:.72rem;color:${T.sub};font-style:italic;padding:8px 10px;border-left:3px solid ${T.accent};background:${T.row};border-radius:4px;">${esc(s.notes)}</div>` : '' }
+    ${payHtml}
+  </div>
+
+  <!-- Footer -->
+  <div style="margin:0 24px 18px;padding-top:10px;border-top:1px solid ${T.border};text-align:center;font-size:.6rem;color:${T.sub};letter-spacing:.05em;">
+    THANK YOU FOR YOUR BUSINESS
+  </div>
+</div>`;
 }
 
-// ── Main preview refresh ──────────────────────────────────────────────────
-function preview() {
-  const s = getState();
-  document.getElementById('previewWrap').innerHTML = renderPreview(s, currentTheme);
-  // Update grand total in form
-  let sum = 0;
-  document.querySelectorAll('.row-total').forEach(el => sum += parseFloat(el.textContent)||0);
-  document.getElementById('grand').textContent = sum.toFixed(2);
+function esc(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Preview throttled (runs max once per 150ms to stay snappy) ────────────
+function schedulePreview() {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(renderPreview, 150);
+}
+
+function renderPreview() {
+  try {
+    const wrap = document.getElementById('previewWrap');
+    if (!wrap) return;
+    wrap.innerHTML = buildPreview(getState(), currentTheme);
+  } catch(e) {
+    console.warn('Preview error:', e);
+  }
 }
 
 // ── Row helpers ───────────────────────────────────────────────────────────
 function calcRow(inp) {
   const row = inp.closest('.row');
-  const q = parseFloat(row.querySelector('[name="quantity[]"]').value)||0;
-  const p = parseFloat(row.querySelector('[name="unit_price[]"]').value)||0;
-  row.querySelector('.row-total').textContent = (q*p).toFixed(2);
+  const q = parseFloat(row.querySelector('[name="quantity[]"]').value) || 0;
+  const p = parseFloat(row.querySelector('[name="unit_price[]"]').value) || 0;
+  row.querySelector('.row-total').textContent = (q * p).toFixed(2);
   updateGrand();
 }
 
 function updateGrand() {
-  let s=0; document.querySelectorAll('.row-total').forEach(e=>s+=parseFloat(e.textContent)||0);
-  document.getElementById('grand').textContent=s.toFixed(2);
+  let s = 0;
+  document.querySelectorAll('.row-total').forEach(e => s += parseFloat(e.textContent) || 0);
+  document.getElementById('grand').textContent = s.toFixed(2);
 }
 
 function addRow() {
-  const div=document.createElement('div');
-  div.className='row grid grid-cols-12 gap-1 items-center';
-  div.innerHTML=`
-    <input name="description[]" type="text" oninput="calcRow(this);preview()" placeholder="Service description" class="col-span-12 sm:col-span-6 input text-sm"/>
-    <input name="quantity[]" type="number" step="0.01" min="0" value="1" oninput="calcRow(this);preview()" class="col-span-4 sm:col-span-2 input text-sm text-center"/>
-    <input name="unit_price[]" type="number" step="0.01" min="0" value="0" oninput="calcRow(this);preview()" class="col-span-5 sm:col-span-2 input text-sm text-right"/>
+  const div = document.createElement('div');
+  div.className = 'row grid grid-cols-12 gap-1 items-center';
+  div.innerHTML = `
+    <input name="description[]" type="text" oninput="calcRow(this);schedulePreview()" placeholder="Service description" class="col-span-12 sm:col-span-6 finput text-sm"/>
+    <input name="quantity[]" type="number" step="0.01" min="0" value="1" oninput="calcRow(this);schedulePreview()" class="col-span-4 sm:col-span-2 finput text-sm text-center"/>
+    <input name="unit_price[]" type="number" step="0.01" min="0" value="0" oninput="calcRow(this);schedulePreview()" class="col-span-5 sm:col-span-2 finput text-sm text-right"/>
     <div class="col-span-3 sm:col-span-2 flex items-center justify-end gap-1">
       <span class="row-total text-sm font-semibold text-slate-700 min-w-[50px] text-right">0.00</span>
-      <button type="button" onclick="removeRow(this)" class="text-slate-300 hover:text-red-500 text-lg ml-1 leading-none">&times;</button>
+      <button type="button" onclick="removeRow(this)" class="text-slate-300 hover:text-red-500 text-lg ml-1">&times;</button>
     </div>`;
   document.getElementById('rows').appendChild(div);
   div.querySelector('input').focus();
+  schedulePreview();
 }
 
 function removeRow(btn) {
-  if(document.querySelectorAll('.row').length<=1) return;
+  if (document.querySelectorAll('.row').length <= 1) return;
   btn.closest('.row').remove();
-  updateGrand(); preview();
+  updateGrand();
+  schedulePreview();
 }
 
-function submitForm() { document.getElementById('invoiceForm').submit(); }
-
-// Init
-window.addEventListener('DOMContentLoaded', () => { applyTemplate(currentTheme); preview(); });
+// ── Boot ──────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  updateGrand();
+  renderPreview();  // immediate first render
+});
 </script>
 {% endblock %}
