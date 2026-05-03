@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit" if estimate else "New" }} Estimate{% endblock %}
+{% block page_title %}{{ "Edit " + estimate.estimate_number if estimate else "New Estimate" }}{% endblock %}
+
+{% block header_actions %}
+<button onclick="document.getElementById('estimateForm').submit()"
+        class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2 rounded-lg flex items-center gap-2">
+  <i class="fas fa-save"></i> {{ "Save Changes" if estimate else "Create Estimate" }}
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-4">
+<form id="estimateForm" method="POST"
+      action="{{ '/estimates/' + estimate.id|string + '/edit' if estimate else '/estimates/new' }}">
+
+  <div class="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 text-sm text-indigo-700 flex items-center gap-2">
+    <i class="fas fa-file-contract text-indigo-400"></i>
+    Once the client accepts, click <strong>"→ Invoice"</strong> on the estimates list to convert in 1 click.
+  </div>
+
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+    <h3 class="font-semibold text-slate-700 mb-4">Estimate Details</h3>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="flabel">Estimate #</label>
+        <input name="estimate_number" type="text" class="finput"
+               value="{{ estimate.estimate_number if estimate else next_number }}"
+               {% if estimate %}readonly{% endif %}/>
+      </div>
+      <div>
+        <label class="flabel">Client <span class="text-red-400">*</span></label>
+        <select name="client_id" required class="finput bg-white">
+          {% for c in clients %}
+          <option value="{{ c.id }}" {% if estimate and estimate.client_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="flabel">Expiry Date</label>
+        <input name="expiry_date" type="date" class="finput"
+               value="{{ estimate.expiry_date.isoformat() if estimate and estimate.expiry_date else '' }}"/>
+      </div>
+      <div>
+        <label class="flabel">Currency</label>
+        <select name="currency" class="finput bg-white">
+          {% for cur in currencies %}
+          <option value="{{ cur }}" {% if (estimate and estimate.currency == cur) or (not estimate and cur == "USD") %}selected{% endif %}>{{ cur }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if estimate %}
+      <div>
+        <label class="flabel">Status</label>
+        <select name="status" class="finput bg-white">
+          {% for s in ["draft", "sent", "accepted", "declined"] %}
+          <option value="{{ s }}" {% if estimate.status == s %}selected{% endif %}>{{ s | capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="flabel">Category</label>
+        <select name="category" class="finput bg-white">
+          {% for cat in categories %}
+          <option value="{{ cat }}" {% if estimate.category == cat %}selected{% endif %}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% else %}
+      <input type="hidden" name="category" value="Other">
+      <input type="hidden" name="status" value="draft">
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Line Items with item library autocomplete -->
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-semibold text-slate-700">Line Items</h3>
+      <button type="button" onclick="addRow()" class="text-indigo-600 text-sm font-medium flex items-center gap-1">
+        <i class="fas fa-plus-circle"></i> Add Row
+      </button>
+    </div>
+    <div id="rows" class="space-y-2">
+      {% if estimate and estimate.line_items %}
+        {% for item in estimate.line_items %}
+        <div class="row grid grid-cols-12 gap-1 items-center">
+          <div class="col-span-12 sm:col-span-6 relative">
+            <input name="description[]" type="text" value="{{ item.description }}" oninput="calcRow(this)" placeholder="Service description" class="finput text-sm w-full"/>
+          </div>
+          <input name="quantity[]" type="number" step="0.01" min="0" value="{{ item.quantity }}" oninput="calcRow(this)" class="col-span-4 sm:col-span-2 finput text-sm text-center"/>
+          <input name="unit_price[]" type="number" step="0.01" min="0" value="{{ item.unit_price }}" oninput="calcRow(this)" class="col-span-5 sm:col-span-2 finput text-sm text-right"/>
+          <div class="col-span-3 sm:col-span-2 flex items-center justify-end gap-1">
+            <span class="row-total text-sm font-semibold text-slate-700 min-w-[50px] text-right">{{ "%.2f"|format(item.line_total) }}</span>
+            <button type="button" onclick="removeRow(this)" class="text-slate-300 hover:text-red-500 text-lg ml-1">&times;</button>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="row grid grid-cols-12 gap-1 items-center">
+          <div class="col-span-12 sm:col-span-6 relative">
+            <input name="description[]" type="text" oninput="calcRow(this)" placeholder="Type service name or search library…" class="finput text-sm w-full"/>
+          </div>
+          <input name="quantity[]" type="number" step="0.01" min="0" value="1" oninput="calcRow(this)" class="col-span-4 sm:col-span-2 finput text-sm text-center"/>
+          <input name="unit_price[]" type="number" step="0.01" min="0" value="0" oninput="calcRow(this)" class="col-span-5 sm:col-span-2 finput text-sm text-right"/>
+          <div class="col-span-3 sm:col-span-2 flex items-center justify-end gap-1">
+            <span class="row-total text-sm font-semibold text-slate-700 min-w-[50px] text-right">0.00</span>
+            <button type="button" onclick="removeRow(this)" class="text-slate-300 hover:text-red-500 text-lg ml-1">&times;</button>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+    <div class="flex justify-end mt-3 pt-3 border-t border-slate-200">
+      <div class="text-right">
+        <p class="text-xs text-slate-400 uppercase font-semibold tracking-wide">Estimate Total</p>
+        <p id="grand" class="text-2xl font-bold text-indigo-700">
+          {% if estimate %}{{ "%.2f"|format(estimate.total) }}{% else %}0.00{% endif %}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
+    <h3 class="font-semibold text-slate-700">Notes</h3>
+    <textarea name="notes" rows="3" class="finput" placeholder="Terms and conditions, project scope, validity period…">{{ estimate.notes if estimate else "" }}</textarea>
+  </div>
+
+</form>
+</div>
+
+<style>
+.flabel { display:block; font-size:.68rem; font-weight:700; color:#64748b; margin-bottom:.3rem; text-transform:uppercase; letter-spacing:.06em; }
+.finput  { width:100%; border:1px solid #e2e8f0; border-radius:.5rem; padding:.6rem .75rem; font-size:.875rem; outline:none; }
+.finput:focus { box-shadow:0 0 0 2px #a5b4fc; border-color:#818cf8; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function calcRow(inp) {
+  const row = inp.closest('.row');
+  const q = parseFloat(row.querySelector('[name="quantity[]"]').value)||0;
+  const p = parseFloat(row.querySelector('[name="unit_price[]"]').value)||0;
+  row.querySelector('.row-total').textContent = (q*p).toFixed(2);
+  let s=0; document.querySelectorAll('.row-total').forEach(e=>s+=parseFloat(e.textContent)||0);
+  document.getElementById('grand').textContent=s.toFixed(2);
+}
+function addRow() {
+  const div=document.createElement('div');
+  div.className='row grid grid-cols-12 gap-1 items-center';
+  div.innerHTML=`
+    <div class="col-span-12 sm:col-span-6 relative">
+      <input name="description[]" type="text" oninput="calcRow(this)" placeholder="Service description" class="finput text-sm w-full"/>
+    </div>
+    <input name="quantity[]" type="number" step="0.01" min="0" value="1" oninput="calcRow(this)" class="col-span-4 sm:col-span-2 finput text-sm text-center"/>
+    <input name="unit_price[]" type="number" step="0.01" min="0" value="0" oninput="calcRow(this)" class="col-span-5 sm:col-span-2 finput text-sm text-right"/>
+    <div class="col-span-3 sm:col-span-2 flex items-center justify-end gap-1">
+      <span class="row-total text-sm font-semibold text-slate-700 min-w-[50px] text-right">0.00</span>
+      <button type="button" onclick="removeRow(this)" class="text-slate-300 hover:text-red-500 text-lg ml-1">&times;</button>
+    </div>`;
+  document.getElementById('rows').appendChild(div);
+  div.querySelector('input').focus();
+}
+function removeRow(btn) {
+  if(document.querySelectorAll('.row').length<=1) return;
+  btn.closest('.row').remove();
+  let s=0; document.querySelectorAll('.row-total').forEach(e=>s+=parseFloat(e.textContent)||0);
+  document.getElementById('grand').textContent=s.toFixed(2);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Estimates{% endblock %}
+{% block page_title %}Estimates & Quotes{% endblock %}
+
+{% block header_actions %}
+<a href="/estimates/new"
+   class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2">
+  <i class="fas fa-plus"></i> New Estimate
+</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="mb-4 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 text-sm text-indigo-700 flex items-center gap-2">
+  <i class="fas fa-file-contract text-indigo-400"></i>
+  <span>Send estimates to clients for approval, then <strong>convert to invoice in 1 click</strong> — no re-typing.</span>
+</div>
+
+{% if estimates %}
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-50 border-b border-slate-200">
+      <tr>
+        <th class="text-left px-5 py-3 font-semibold text-slate-600 text-xs uppercase">Estimate #</th>
+        <th class="text-left px-5 py-3 font-semibold text-slate-600 text-xs uppercase">Client</th>
+        <th class="text-left px-5 py-3 font-semibold text-slate-600 text-xs uppercase hidden md:table-cell">Expires</th>
+        <th class="text-right px-5 py-3 font-semibold text-slate-600 text-xs uppercase">Amount</th>
+        <th class="text-center px-5 py-3 font-semibold text-slate-600 text-xs uppercase">Status</th>
+        <th class="text-right px-5 py-3 font-semibold text-slate-600 text-xs uppercase">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for est in estimates %}
+      {% set expired = est.expiry_date and est.expiry_date < today %}
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="px-5 py-3 font-mono text-xs text-slate-500">{{ est.estimate_number }}</td>
+        <td class="px-5 py-3 font-semibold text-slate-800">{{ est.client.name }}</td>
+        <td class="px-5 py-3 hidden md:table-cell {% if expired %}text-red-500{% else %}text-slate-500{% endif %}">
+          {{ est.expiry_date.strftime('%b %d, %Y') if est.expiry_date else "—" }}
+          {% if expired %}<span class="text-xs">(expired)</span>{% endif %}
+        </td>
+        <td class="px-5 py-3 text-right font-bold text-slate-800">
+          {{ est.currency }} {{ "%.2f"|format(est.total) }}
+        </td>
+        <td class="px-5 py-3 text-center">
+          {% if est.status == "accepted" %}
+            <span class="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full">✓ Accepted</span>
+          {% elif est.status == "declined" %}
+            <span class="bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1 rounded-full">✗ Declined</span>
+          {% elif est.status == "sent" %}
+            <span class="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-full">Sent</span>
+          {% else %}
+            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-2.5 py-1 rounded-full">Draft</span>
+          {% endif %}
+        </td>
+        <td class="px-5 py-3 text-right">
+          <div class="flex items-center justify-end gap-2">
+            {% if est.status != "accepted" and not est.converted_to_invoice_id %}
+            <form method="POST" action="/estimates/{{ est.id }}/convert">
+              <button type="submit" title="Convert to Invoice"
+                      class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-emerald-200 flex items-center gap-1 whitespace-nowrap">
+                <i class="fas fa-file-invoice"></i> → Invoice
+              </button>
+            </form>
+            {% elif est.converted_to_invoice_id %}
+            <span class="text-xs text-slate-400 italic">Converted</span>
+            {% endif %}
+            <a href="/estimates/{{ est.id }}/edit" class="text-slate-400 hover:text-indigo-600 text-sm" title="Edit">
+              <i class="fas fa-pen-to-square"></i>
+            </a>
+            <form method="POST" action="/estimates/{{ est.id }}/delete" class="inline"
+                  onsubmit="return confirm('Delete this estimate?')">
+              <button type="submit" class="text-slate-400 hover:text-red-500 text-sm">
+                <i class="fas fa-trash"></i>
+              </button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="text-center py-20 text-slate-400">
+  <p class="text-5xl mb-3">📋</p>
+  <p class="text-lg font-medium text-slate-600">No estimates yet</p>
+  <p class="text-sm mt-1 mb-4">Send quotes to clients before the work begins.</p>
+  <a href="/estimates/new"
+     class="inline-flex items-center gap-2 bg-indigo-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-indigo-700">
+    <i class="fas fa-plus"></i> Create first estimate
+  </a>
+</div>
+{% endif %}
+{% endblock %}

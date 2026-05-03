@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}Item Library{% endblock %}
+{% block page_title %}Item & Service Library{% endblock %}
+
+{% block header_actions %}
+<button onclick="document.getElementById('addItemModal').classList.remove('hidden')"
+        class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2">
+  <i class="fas fa-plus"></i> Add Item
+</button>
+{% endblock %}
+
+{% block content %}
+
+{% if success %}
+<div class="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2" data-flash>
+  <i class="fas fa-circle-check"></i> Item {{ "added" if success == "added" else "updated" }} successfully.
+</div>
+{% endif %}
+
+<div class="mb-4 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 text-sm text-indigo-700 flex items-center gap-2">
+  <i class="fas fa-bolt text-indigo-400"></i>
+  <span>Items saved here appear as <strong>autocomplete suggestions</strong> when you type in invoice line items — saving you time on every invoice.</span>
+</div>
+
+{% if items %}
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-50 border-b border-slate-200">
+      <tr>
+        <th class="text-left px-5 py-3 font-semibold text-slate-600 text-xs uppercase">Name</th>
+        <th class="text-left px-5 py-3 font-semibold text-slate-600 text-xs uppercase hidden md:table-cell">Description</th>
+        <th class="text-left px-5 py-3 font-semibold text-slate-600 text-xs uppercase hidden sm:table-cell">Unit</th>
+        <th class="text-left px-5 py-3 font-semibold text-slate-600 text-xs uppercase hidden sm:table-cell">Category</th>
+        <th class="text-right px-5 py-3 font-semibold text-slate-600 text-xs uppercase">Price</th>
+        <th class="text-right px-5 py-3 font-semibold text-slate-600 text-xs uppercase">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for item in items %}
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="px-5 py-3 font-semibold text-slate-800">{{ item.name }}</td>
+        <td class="px-5 py-3 text-slate-500 hidden md:table-cell max-w-xs truncate">{{ item.description or "—" }}</td>
+        <td class="px-5 py-3 hidden sm:table-cell">
+          <span class="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{{ item.unit }}</span>
+        </td>
+        <td class="px-5 py-3 hidden sm:table-cell">
+          <span class="bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded-full">{{ item.category }}</span>
+        </td>
+        <td class="px-5 py-3 text-right font-bold text-slate-800">${{ "%.2f"|format(item.unit_price) }}</td>
+        <td class="px-5 py-3 text-right space-x-3">
+          <a href="/items/{{ item.id }}/edit" class="text-indigo-600 hover:text-indigo-800 text-xs font-medium">
+            <i class="fas fa-pen-to-square"></i> Edit
+          </a>
+          <form method="POST" action="/items/{{ item.id }}/delete" class="inline"
+                onsubmit="return confirm('Delete {{ item.name }}?')">
+            <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium">
+              <i class="fas fa-trash"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="text-center py-20 text-slate-400">
+  <p class="text-5xl mb-3">📦</p>
+  <p class="text-lg font-medium text-slate-600">No items yet</p>
+  <p class="text-sm mt-1 mb-4">Save your common services to auto-fill invoice lines in seconds.</p>
+  <button onclick="document.getElementById('addItemModal').classList.remove('hidden')"
+          class="inline-flex items-center gap-2 bg-indigo-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-indigo-700">
+    <i class="fas fa-plus"></i> Add your first item
+  </button>
+</div>
+{% endif %}
+
+<!-- Add Item Modal -->
+<div id="addItemModal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="text-lg font-bold text-slate-800">Add Item / Service</h3>
+      <button onclick="document.getElementById('addItemModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+    </div>
+    <form method="POST" action="/items/add" class="space-y-3">
+      <div>
+        <label class="field-label">Item Name <span class="text-red-400">*</span></label>
+        <input name="name" type="text" required class="field-input" placeholder="e.g. Logo Design"/>
+      </div>
+      <div>
+        <label class="field-label">Description</label>
+        <input name="description" type="text" class="field-input" placeholder="Optional detail shown in autocomplete"/>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="field-label">Unit Price ($) <span class="text-red-400">*</span></label>
+          <input name="unit_price" type="number" step="0.01" min="0" required class="field-input" placeholder="0.00"/>
+        </div>
+        <div>
+          <label class="field-label">Unit</label>
+          <select name="unit" class="field-input bg-white">
+            {% for u in units %}
+            <option value="{{ u }}">{{ u }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="field-label">Category</label>
+        <select name="category" class="field-input bg-white">
+          {% for cat in categories %}
+          <option value="{{ cat }}">{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="flex gap-3 pt-1">
+        <button type="button" onclick="document.getElementById('addItemModal').classList.add('hidden')"
+                class="flex-1 border border-slate-300 rounded-lg py-2.5 text-sm text-slate-600 hover:bg-slate-50">Cancel</button>
+        <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg py-2.5 text-sm font-semibold">Save Item</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if edit_item %}
+<div class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="text-lg font-bold">Edit Item</h3>
+      <a href="/items/" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</a>
+    </div>
+    <form method="POST" action="/items/{{ edit_item.id }}/edit" class="space-y-3">
+      <div>
+        <label class="field-label">Name</label>
+        <input name="name" type="text" required class="field-input" value="{{ edit_item.name }}"/>
+      </div>
+      <div>
+        <label class="field-label">Description</label>
+        <input name="description" type="text" class="field-input" value="{{ edit_item.description or '' }}"/>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="field-label">Unit Price ($)</label>
+          <input name="unit_price" type="number" step="0.01" min="0" class="field-input" value="{{ edit_item.unit_price }}"/>
+        </div>
+        <div>
+          <label class="field-label">Unit</label>
+          <select name="unit" class="field-input bg-white">
+            {% for u in units %}
+            <option value="{{ u }}" {% if edit_item.unit == u %}selected{% endif %}>{{ u }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="field-label">Category</label>
+        <select name="category" class="field-input bg-white">
+          {% for cat in categories %}
+          <option value="{{ cat }}" {% if edit_item.category == cat %}selected{% endif %}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="flex gap-3 pt-1">
+        <a href="/items/" class="flex-1 border border-slate-300 rounded-lg py-2.5 text-sm text-slate-600 hover:bg-slate-50 text-center">Cancel</a>
+        <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg py-2.5 text-sm font-semibold">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<style>
+.field-label { display:block; font-size:.7rem; font-weight:700; color:#64748b; margin-bottom:.3rem; text-transform:uppercase; letter-spacing:.05em; }
+.field-input  { width:100%; border:1px solid #e2e8f0; border-radius:.5rem; padding:.6rem .75rem; font-size:.875rem; outline:none; }
+.field-input:focus { box-shadow:0 0 0 2px #a5b4fc; border-color:#818cf8; }
+</style>
+{% endblock %}

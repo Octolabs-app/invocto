@@ -1,102 +1,147 @@
 <!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>{% block title %}Tax-Ready Invoice{% endblock %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <style>
-    /* Smooth transitions on nav hover */
-    .nav-link { transition: background 0.15s ease; }
-    /* Hide number input spinners for cleaner look */
-    input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
+    .nav-link { transition: background 0.12s ease, color 0.12s ease; }
+    .nav-group-label { font-size:.6rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; padding:.75rem .75rem .25rem; color:#6366f1; opacity:.6; }
+    aside::-webkit-scrollbar { width:3px; }
+    aside::-webkit-scrollbar-thumb { background:rgba(255,255,255,.1); border-radius:2px; }
+    /* Keyboard shortcut badge */
+    .kbd { display:inline-flex;align-items:center;padding:.1rem .35rem;font-size:.6rem;font-family:monospace;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:.25rem;color:rgba(255,255,255,.4);margin-left:auto; }
   </style>
 </head>
 <body class="h-full bg-slate-50 text-slate-800 font-sans">
-
 <div class="flex h-screen overflow-hidden">
 
-  <!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
-  <aside class="w-60 shrink-0 bg-indigo-950 text-indigo-100 flex flex-col shadow-xl z-10">
-
+  <!-- ── Sidebar ──────────────────────────────────────────────────────── -->
+  <aside class="w-56 shrink-0 bg-indigo-950 text-indigo-100 flex flex-col shadow-xl z-10">
     <!-- Brand -->
-    <div class="px-6 py-5 border-b border-indigo-800">
-      <div class="flex items-center gap-2">
-        <span class="text-2xl">📄</span>
+    <div class="px-5 py-4 border-b border-indigo-900">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-black text-sm">T</div>
         <div>
-          <p class="font-bold text-white leading-tight">Tax-Ready</p>
+          <p class="font-bold text-white text-sm leading-tight">Tax-Ready</p>
           <p class="text-indigo-400 text-xs">Invoice Manager</p>
         </div>
       </div>
     </div>
 
-    <!-- Nav links -->
-    <nav class="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-      {% set path = request.url.path %}
-      <a href="/"
-         class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                {% if path == '/' %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800 hover:text-white{% endif %}">
-        <i class="fas fa-gauge-high w-4 text-center"></i> Dashboard
-      </a>
-      <a href="/clients/"
-         class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                {% if '/clients' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800 hover:text-white{% endif %}">
-        <i class="fas fa-users w-4 text-center"></i> Clients
-      </a>
-      <a href="/invoices/"
-         class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                {% if '/invoices' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800 hover:text-white{% endif %}">
-        <i class="fas fa-file-invoice-dollar w-4 text-center"></i> Invoices
-      </a>
-      <a href="/expenses/"
-         class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                {% if '/expenses' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800 hover:text-white{% endif %}">
-        <i class="fas fa-receipt w-4 text-center"></i> Expenses
-      </a>
-      <a href="/profile/"
-         class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                {% if '/profile' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800 hover:text-white{% endif %}">
-        <i class="fas fa-user-circle w-4 text-center"></i> My Profile
-      </a>
-      <a href="/reports/"
-         class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                {% if '/reports' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800 hover:text-white{% endif %}">
-        <i class="fas fa-chart-pie w-4 text-center"></i> Tax Reports
-      </a>
-    </nav>
-
-    <!-- User + logout -->
-    <div class="px-4 py-4 border-t border-indigo-800">
-      <p class="text-indigo-400 text-xs truncate mb-2">
-        <i class="fas fa-circle-user mr-1"></i>{{ user.email if user else "" }}
-      </p>
-      <a href="/logout"
-         class="flex items-center gap-2 text-indigo-400 hover:text-red-400 text-sm transition-colors">
-        <i class="fas fa-right-from-bracket"></i> Sign out
+    <!-- Quick action -->
+    <div class="px-3 pt-3 pb-1">
+      <a href="/invoices/new"
+         class="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition-colors w-full">
+        <i class="fas fa-plus"></i> New Invoice
+        <span class="kbd">N</span>
       </a>
     </div>
 
+    <!-- Nav -->
+    <nav class="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto text-xs">
+      {% set path = request.url.path %}
+
+      <p class="nav-group-label">Overview</p>
+      <a href="/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
+         {% if path == '/' %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+        <i class="fas fa-gauge-high w-4 text-center text-[11px]"></i> Dashboard
+      </a>
+
+      <p class="nav-group-label mt-1">Work</p>
+      <a href="/clients/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
+         {% if '/clients' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+        <i class="fas fa-users w-4 text-center text-[11px]"></i> Clients
+      </a>
+      <a href="/invoices/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
+         {% if '/invoices' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+        <i class="fas fa-file-invoice-dollar w-4 text-center text-[11px]"></i> Invoices
+      </a>
+      <a href="/estimates/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
+         {% if '/estimates' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+        <i class="fas fa-file-contract w-4 text-center text-[11px]"></i> Estimates
+      </a>
+      <a href="/items/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
+         {% if '/items' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+        <i class="fas fa-box-archive w-4 text-center text-[11px]"></i> Item Library
+      </a>
+
+      <p class="nav-group-label mt-1">Finance</p>
+      <a href="/expenses/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
+         {% if '/expenses' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+        <i class="fas fa-receipt w-4 text-center text-[11px]"></i> Expenses
+      </a>
+      <a href="/reports/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
+         {% if '/reports' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+        <i class="fas fa-chart-pie w-4 text-center text-[11px]"></i> Tax Reports
+      </a>
+
+      <p class="nav-group-label mt-1">Account</p>
+      <a href="/profile/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
+         {% if '/profile' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+        <i class="fas fa-user-circle w-4 text-center text-[11px]"></i> My Profile
+      </a>
+      <a href="/billing/upgrade" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
+         {% if '/billing' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+        <i class="fas fa-star w-4 text-center text-[11px]"></i>
+        <span>Upgrade Pro</span>
+        <span class="ml-auto bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">$9</span>
+      </a>
+    </nav>
+
+    <!-- User -->
+    <div class="px-3 py-3 border-t border-indigo-900">
+      <p class="text-indigo-400 text-xs truncate mb-1.5 px-1">
+        <i class="fas fa-circle-user mr-1 text-indigo-500"></i>{{ user.email if user else "" }}
+      </p>
+      <a href="/logout"
+         class="flex items-center gap-2 text-indigo-500 hover:text-red-400 text-xs transition-colors px-1">
+        <i class="fas fa-right-from-bracket text-[11px]"></i> Sign out
+      </a>
+    </div>
   </aside>
 
-  <!-- ── Main content ──────────────────────────────────────────────────────── -->
+  <!-- ── Main ─────────────────────────────────────────────────────────── -->
   <main class="flex-1 overflow-y-auto">
-    <!-- Top bar -->
-    <header class="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-slate-200 px-8 py-3 flex items-center justify-between">
-      <h2 class="font-semibold text-slate-700">{% block page_title %}{% endblock %}</h2>
-      <div class="flex items-center gap-3">
-        {% block header_actions %}{% endblock %}
-      </div>
+    <header class="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-slate-200 px-6 py-3 flex items-center justify-between">
+      <h2 class="font-bold text-slate-700">{% block page_title %}{% endblock %}</h2>
+      <div class="flex items-center gap-2">{% block header_actions %}{% endblock %}</div>
     </header>
-
-    <div class="p-8">
+    <div class="p-6">
       {% block content %}{% endblock %}
     </div>
   </main>
 
-</div><!-- end flex -->
+</div>
 
+<!-- Global keyboard shortcuts -->
+<script>
+document.addEventListener('keydown', e => {
+  // Skip if typing in an input/textarea
+  if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+  if (e.key === 'n' || e.key === 'N') { e.preventDefault(); window.location='/invoices/new'; }
+  if (e.key === 'e' || e.key === 'E') { e.preventDefault(); window.location='/estimates/new'; }
+  if (e.key === 'd' || e.key === 'D') { e.preventDefault(); window.location='/'; }
+  if (e.key === 'i' || e.key === 'I') { e.preventDefault(); window.location='/invoices/'; }
+  if (e.key === 'c' || e.key === 'C') { e.preventDefault(); window.location='/clients/'; }
+});
+// Auto-dismiss flash messages
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('[data-flash]').forEach(el => {
+    setTimeout(() => { el.style.transition='opacity .4s'; el.style.opacity='0'; setTimeout(()=>el.remove(),400); }, 4000);
+  });
+  // Close modals on backdrop click
+  document.querySelectorAll('[id$="Modal"]').forEach(m => {
+    m.addEventListener('click', e => { if (e.target===m) m.classList.add('hidden'); });
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key==='Escape') document.querySelectorAll('[id$="Modal"]:not(.hidden)').forEach(m=>m.classList.add('hidden'));
+  });
+});
+</script>
 <script src="/static/js/main.js"></script>
 {% block scripts %}{% endblock %}
 </body>

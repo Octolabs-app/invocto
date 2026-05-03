@@ -120,3 +120,93 @@ class Expense(Base):
     created_at  = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="expenses")
+
+
+class Item(Base):
+    """Saved service/product in the user's item library."""
+    __tablename__ = "items"
+    id          = Column(Integer, primary_key=True, index=True)
+    user_id     = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name        = Column(String(255), nullable=False)
+    description = Column(Text)
+    unit_price  = Column(Float, default=0.0)
+    unit        = Column(String(50), default="service")
+    category    = Column(String(50), default="Other")
+    created_at  = Column(DateTime, default=datetime.utcnow)
+    user        = relationship("User")
+
+
+class Estimate(Base):
+    """A quote/estimate that can be converted to an invoice."""
+    __tablename__ = "estimates"
+    id              = Column(Integer, primary_key=True, index=True)
+    user_id         = Column(Integer, ForeignKey("users.id"), nullable=False)
+    client_id       = Column(Integer, ForeignKey("clients.id"), nullable=False)
+    estimate_number = Column(String(50), nullable=False)
+    status          = Column(String(20), default="draft")
+    expiry_date     = Column(Date)
+    currency        = Column(String(10), default="USD")
+    category        = Column(String(50), default="Other")
+    notes           = Column(Text)
+    payment_note    = Column(Text)
+    template        = Column(String(20), default="minimal")
+    converted_to_invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=True)
+    created_at      = Column(DateTime, default=datetime.utcnow)
+
+    user       = relationship("User")
+    client     = relationship("Client")
+    line_items = relationship("EstimateLineItem", back_populates="estimate", cascade="all, delete-orphan")
+
+    @property
+    def total(self):
+        return sum(i.quantity * i.unit_price for i in self.line_items)
+
+
+class EstimateLineItem(Base):
+    __tablename__ = "estimate_line_items"
+    id          = Column(Integer, primary_key=True)
+    estimate_id = Column(Integer, ForeignKey("estimates.id"), nullable=False)
+    description = Column(String(500), nullable=False)
+    quantity    = Column(Float, default=1.0)
+    unit_price  = Column(Float, default=0.0)
+    estimate    = relationship("Estimate", back_populates="line_items")
+
+    @property
+    def line_total(self):
+        return self.quantity * self.unit_price
+
+
+class RecurringInvoice(Base):
+    """Config for auto-generating invoices on a schedule."""
+    __tablename__ = "recurring_invoices"
+    id          = Column(Integer, primary_key=True, index=True)
+    user_id     = Column(Integer, ForeignKey("users.id"), nullable=False)
+    client_id   = Column(Integer, ForeignKey("clients.id"), nullable=False)
+    frequency   = Column(String(20), default="monthly")
+    next_date   = Column(Date, nullable=False)
+    end_date    = Column(Date)
+    active      = Column(Boolean, default=True)
+    currency    = Column(String(10), default="USD")
+    category    = Column(String(50), default="Other")
+    notes       = Column(Text)
+    payment_note= Column(Text)
+    template    = Column(String(20), default="minimal")
+    created_at  = Column(DateTime, default=datetime.utcnow)
+
+    user       = relationship("User")
+    client     = relationship("Client")
+    line_items = relationship("RecurringLineItem", back_populates="recurring", cascade="all, delete-orphan")
+
+
+class RecurringLineItem(Base):
+    __tablename__ = "recurring_line_items"
+    id                   = Column(Integer, primary_key=True)
+    recurring_invoice_id = Column(Integer, ForeignKey("recurring_invoices.id"), nullable=False)
+    description          = Column(String(500), nullable=False)
+    quantity             = Column(Float, default=1.0)
+    unit_price           = Column(Float, default=0.0)
+    recurring            = relationship("RecurringInvoice", back_populates="line_items")
+
+    @property
+    def line_total(self):
+        return self.quantity * self.unit_price

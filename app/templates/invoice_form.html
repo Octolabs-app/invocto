@@ -413,7 +413,111 @@ function removeRow(btn) {
   schedulePreview();
 }
 
-// ── Boot ──────────────────────────────────────────────────────────────────
+
+// ── Item Library Autocomplete ─────────────────────────────────────────────
+let acTimer = null;
+let activeInput = null;
+
+function attachAutocomplete(input) {
+  input.addEventListener('input', () => {
+    clearTimeout(acTimer);
+    const q = input.value.trim();
+    if (q.length < 1) { hideAC(); return; }
+    acTimer = setTimeout(() => fetchItems(q, input), 200);
+  });
+  input.addEventListener('blur', () => setTimeout(hideAC, 150));
+  input.addEventListener('keydown', e => {
+    const items = document.querySelectorAll('.ac-item');
+    if (!items.length) return;
+    const active = document.querySelector('.ac-item.bg-indigo-50');
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const next = active ? active.nextElementSibling : items[0];
+      if (next) { active?.classList.remove('bg-indigo-50'); next.classList.add('bg-indigo-50'); }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prev = active?.previousElementSibling;
+      if (prev) { active.classList.remove('bg-indigo-50'); prev.classList.add('bg-indigo-50'); }
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      const sel = document.querySelector('.ac-item.bg-indigo-50') || items[0];
+      if (sel) { e.preventDefault(); sel.click(); }
+    } else if (e.key === 'Escape') {
+      hideAC();
+    }
+  });
+}
+
+function fetchItems(q, input) {
+  activeInput = input;
+  fetch(`/items/api/search?q=${encodeURIComponent(q)}`)
+    .then(r => r.json())
+    .then(items => showAC(items, input))
+    .catch(() => {});
+}
+
+function showAC(items, input) {
+  hideAC();
+  if (!items.length) return;
+  const rect = input.getBoundingClientRect();
+  const drop = document.createElement('div');
+  drop.id = 'acDrop';
+  drop.className = 'fixed z-50 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden';
+  drop.style.cssText = `top:${rect.bottom + window.scrollY + 2}px;left:${rect.left + window.scrollX}px;min-width:${Math.max(rect.width, 260)}px;max-height:220px;overflow-y:auto;`;
+  items.forEach(item => {
+    const d = document.createElement('div');
+    d.className = 'ac-item flex items-center justify-between px-3 py-2.5 cursor-pointer hover:bg-indigo-50 border-b border-slate-100 last:border-0';
+    d.innerHTML = `
+      <div>
+        <p class="text-sm font-semibold text-slate-800">${item.name}</p>
+        ${item.description !== item.name ? `<p class="text-xs text-slate-400">${item.description}</p>` : ''}
+      </div>
+      <div class="text-right ml-4 shrink-0">
+        <p class="text-sm font-bold text-indigo-600">$${item.unit_price.toFixed(2)}</p>
+        <p class="text-xs text-slate-400">${item.unit}</p>
+      </div>`;
+    d.addEventListener('mousedown', () => fillRow(input, item));
+    drop.appendChild(d);
+  });
+  document.body.appendChild(drop);
+}
+
+function hideAC() {
+  document.getElementById('acDrop')?.remove();
+}
+
+function fillRow(descInput, item) {
+  const row = descInput.closest('.row');
+  descInput.value = item.description || item.name;
+  row.querySelector('[name="unit_price[]"]').value = item.unit_price.toFixed(2);
+  row.querySelector('[name="quantity[]"]').value = 1;
+  row.querySelector('.row-total').textContent = item.unit_price.toFixed(2);
+  updateGrand();
+  schedulePreview();
+  hideAC();
+  // Move focus to qty
+  row.querySelector('[name="quantity[]"]').select();
+}
+
+// Attach to all existing description inputs + re-attach on addRow
+function attachAllAC() {
+  document.querySelectorAll('[name="description[]"]').forEach(inp => {
+    if (!inp.dataset.acAttached) {
+      attachAutocomplete(inp);
+      inp.dataset.acAttached = '1';
+    }
+  });
+}
+
+// Override addRow to also attach autocomplete
+const _origAddRow = addRow;
+function addRow() {
+  _origAddRow();
+  attachAllAC();
+}
+
+document.addEventListener('DOMContentLoaded', attachAllAC);
+
+// ── Boot ───────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   updateGrand();
   renderPreview();  // immediate first render
