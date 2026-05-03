@@ -39,6 +39,26 @@
 </div>
 {% endif %}
 
+
+<script>
+function toggleAll(cb) {
+  document.querySelectorAll('.row-check').forEach(c => { c.checked = cb.checked; });
+  updateBulkBar();
+}
+function updateBulkBar() {
+  const checked = [...document.querySelectorAll('.row-check:checked')];
+  const bar = document.getElementById('bulkBar');
+  document.getElementById('bulkCount').textContent = checked.length + ' selected';
+  document.getElementById('bulkIds').value = checked.map(c=>c.value).join(',');
+  bar.classList.toggle('hidden', checked.length === 0);
+  bar.classList.toggle('flex', checked.length > 0);
+}
+function clearSelection() {
+  document.querySelectorAll('.row-check, #selectAll').forEach(c => c.checked = false);
+  updateBulkBar();
+}
+document.addEventListener('change', e => { if (e.target.classList.contains('row-check')) updateBulkBar(); });
+</script>
 {% endblock %}
 {% block page_title %}Invoices{% endblock %}
 
@@ -60,6 +80,18 @@
 
 {% if invoices %}
 
+<!-- Bulk action bar -->
+<div id="bulkBar" class="hidden mb-3 flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2.5">
+  <span id="bulkCount" class="text-sm font-semibold text-indigo-700">0 selected</span>
+  <form method="POST" action="/invoices/bulk-paid" id="bulkForm">
+    <input type="hidden" name="ids" id="bulkIds"/>
+    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1">
+      <i class="fas fa-circle-check"></i> Mark All Paid
+    </button>
+  </form>
+  <button onclick="clearSelection()" class="text-xs text-indigo-500 hover:underline">Clear</button>
+</div>
+
 <!-- ── Filter bar ──────────────────────────────────────────────────────────── -->
 <div class="flex flex-wrap gap-2 mb-4">
   <button onclick="filterInvoices('all')"    id="btn-all"    class="filter-btn active-filter px-3 py-1.5 rounded-full text-xs font-medium border transition-colors">All</button>
@@ -73,6 +105,7 @@
   <table class="w-full text-sm">
     <thead class="bg-slate-50 border-b border-slate-200">
       <tr>
+        <th class="px-5 py-3 w-8"><input type="checkbox" id="selectAll" class="accent-indigo-600" onchange="toggleAll(this)"/></th>
         <th class="text-left px-5 py-3 font-semibold text-slate-600 whitespace-nowrap">Invoice #</th>
         <th class="text-left px-5 py-3 font-semibold text-slate-600">Client</th>
         <th class="text-left px-5 py-3 font-semibold text-slate-600 hidden md:table-cell">Category</th>
@@ -89,6 +122,7 @@
           data-status="{{ 'overdue' if overdue else inv.status }}">
 
         <!-- Invoice number -->
+        <td class="px-5 py-3 w-8"><input type="checkbox" class="row-check accent-indigo-600" value="{{ inv.id }}"/></td>
         <td class="px-5 py-3 font-mono text-xs text-slate-500 whitespace-nowrap">
           {{ inv.invoice_number }}
         </td>

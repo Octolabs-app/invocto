@@ -30,23 +30,35 @@
 <!-- ── Invoice document ─────────────────────────────────────────────────────── -->
 <div class="print-card max-w-3xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
 
-  <!-- Header -->
-  <div class="bg-indigo-700 text-white px-10 py-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-    <div>
-      <p class="text-indigo-200 text-xs uppercase tracking-widest font-semibold mb-1">Invoice</p>
-      <p class="text-3xl font-bold tracking-tight">{{ invoice.invoice_number }}</p>
-    </div>
-    <div class="text-right">
-      <p class="text-sm font-semibold">📄 Tax-Ready Invoice</p>
-      <p class="text-indigo-200 text-sm mt-1">{{ user.email }}</p>
-      {% if invoice.status == "paid" %}
-      <span class="inline-block mt-2 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full tracking-wide">
-        PAID
-      </span>
+  <!-- Header — template-aware, shows logo + business info if profile set -->
+  {% set hcolors = {"minimal": "#6366f1", "bold": "#0f172a", "creative": "#7c3aed"} %}
+  <div style="background:{{ hcolors.get(invoice.template, '#6366f1') }};"
+       class="text-white px-10 py-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+    <!-- Left: Business info / logo -->
+    <div class="flex-1">
+      {% if profile and profile.logo_base64 %}
+      <img src="{{ profile.logo_base64 }}" class="mb-3 object-contain" style="max-height:56px;max-width:160px;"/>
+      {% endif %}
+      {% if profile and profile.business_name %}
+        <p class="font-bold text-white text-lg leading-tight">{{ profile.business_name }}</p>
+        {% if profile.business_reg_number %}<p class="text-xs opacity-70 mt-0.5">Reg: {{ profile.business_reg_number }}</p>{% endif %}
+        {% if profile.business_address %}<p class="text-xs opacity-70">{{ profile.business_address.replace('
+', ' · ') }}</p>{% endif %}
+        {% if profile.business_email %}<p class="text-xs opacity-70">{{ profile.business_email }}</p>{% endif %}
+        {% if profile.business_phone %}<p class="text-xs opacity-70">{{ profile.business_phone }}</p>{% endif %}
       {% else %}
-      <span class="inline-block mt-2 bg-amber-400 text-white text-xs font-bold px-3 py-1 rounded-full tracking-wide">
-        UNPAID
-      </span>
+        <p class="font-semibold text-white">📄 Tax-Ready Invoice</p>
+        <p class="text-xs opacity-70 mt-1">{{ user.email }}</p>
+      {% endif %}
+    </div>
+    <!-- Right: Invoice number + status -->
+    <div class="text-right shrink-0">
+      <p class="text-xs uppercase tracking-widest font-semibold opacity-60 mb-1">Invoice</p>
+      <p class="text-3xl font-black tracking-tight">{{ invoice.invoice_number }}</p>
+      {% if invoice.status == "paid" %}
+      <span class="inline-block mt-2 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full tracking-wide">✓ PAID</span>
+      {% else %}
+      <span class="inline-block mt-2 bg-amber-400 text-white text-xs font-bold px-3 py-1 rounded-full tracking-wide">UNPAID</span>
       {% endif %}
     </div>
   </div>
@@ -129,6 +141,15 @@
   </div>
   {% endif %}
 
+  <!-- Payment details -->
+  {% if invoice.payment_note %}
+  <div class="px-10 pb-4">
+    <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+      <p class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Payment Details</p>
+      <p class="text-sm text-slate-700 font-mono whitespace-pre-line">{{ invoice.payment_note }}</p>
+    </div>
+  </div>
+  {% endif %}
   <!-- Footer -->
   <div class="bg-slate-50 border-t border-slate-200 px-10 py-4 text-center">
     <p class="text-xs text-slate-400">

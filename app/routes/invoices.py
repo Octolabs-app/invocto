@@ -256,3 +256,25 @@ async def print_invoice(invoice_id: int, request: Request, db: Session = Depends
     return templates.TemplateResponse("invoice_print.html", {
         "request": request, "invoice": invoice, "user": user, "profile": profile,
     })
+
+
+# ── Bulk mark paid ────────────────────────────────────────────────────────────
+@router.post("/bulk-paid")
+async def bulk_mark_paid(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    form = await request.form()
+    ids_raw = form.get("ids", "")
+    ids = [int(i) for i in ids_raw.split(",") if i.strip().isdigit()]
+    if ids:
+        invoices = db.query(Invoice).filter(
+            Invoice.id.in_(ids),
+            Invoice.user_id == user.id,
+            Invoice.status == "unpaid"
+        ).all()
+        for inv in invoices:
+            inv.status = "paid"
+            inv.payment_date = date.today()
+        db.commit()
+    return RedirectResponse("/invoices/", status_code=302)
