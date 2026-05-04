@@ -1,7 +1,8 @@
 """
-main.py — FastAPI application entry point.
+main.py — FastAPI application entry point v3.0
 """
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -12,26 +13,61 @@ load_dotenv()
 from .database import engine, Base
 from . import models  # noqa
 from .auth import router as auth_router, COOKIE_NAME
-from .routes.dashboard  import router as dashboard_router
-from .routes.clients    import router as clients_router
-from .routes.invoices   import router as invoices_router
-from .routes.expenses   import router as expenses_router
-from .routes.reports    import router as reports_router
-from .routes.profile    import router as profile_router
-from .routes.billing    import router as billing_router
-from .routes.items      import router as items_router
-from .routes.estimates  import router as estimates_router
+from .routes.dashboard    import router as dashboard_router
+from .routes.clients      import router as clients_router
+from .routes.invoices     import router as invoices_router
+from .routes.expenses     import router as expenses_router
+from .routes.reports      import router as reports_router
+from .routes.profile      import router as profile_router
+from .routes.billing      import router as billing_router
+from .routes.items        import router as items_router
+from .routes.estimates    import router as estimates_router
+from .routes.time_tracker import router as time_router
+from .routes.recurring    import router as recurring_router
+from .routes.public       import router as public_router
 
-try:
-    Base.metadata.create_all(bind=engine)
-    print("INFO:     Database tables verified.")
-except Exception as e:
-    print(f"WARNING:  Could not verify DB tables: {e}")
 
-app = FastAPI(title="Tax-Ready Invoice", version="2.1.0", docs_url=None, redoc_url=None)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("INFO:     Database tables verified.")
+    except Exception as e:
+        print(f"WARNING:  DB table check failed (tables may already exist): {e}")
+
+    # Start scheduler only if APScheduler installed + email configured
+    scheduler_started = False
+    try:
+        from .scheduler import start_scheduler
+        start_scheduler()
+        scheduler_started = True
+        print("INFO:     Scheduler started.")
+    except ImportError:
+        print("INFO:     APScheduler not installed — scheduler disabled.")
+    except Exception as e:
+        print(f"WARNING:  Scheduler failed to start: {e}")
+
+    yield
+
+    # Shutdown
+    if scheduler_started:
+        from .scheduler import stop_scheduler
+        stop_scheduler()
+
+
+app = FastAPI(
+    title="Tax-Ready Invoice",
+    version="3.0.0",
+    docs_url=None,
+    redoc_url=None,
+    lifespan=lifespan,
+)
+
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 app.include_router(auth_router)
+app.include_router(public_router)      # must be before auth middleware check
 app.include_router(dashboard_router)
 app.include_router(clients_router)
 app.include_router(invoices_router)
@@ -41,8 +77,10 @@ app.include_router(profile_router)
 app.include_router(billing_router)
 app.include_router(items_router)
 app.include_router(estimates_router)
+app.include_router(time_router)
+app.include_router(recurring_router)
 
-_PUBLIC = ("/login", "/register", "/static", "/billing/webhook")
+_PUBLIC = ("/login", "/register", "/static", "/billing/webhook", "/invoice/")
 
 @app.middleware("http")
 async def require_login_middleware(request: Request, call_next):

@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Time Tracker{% endblock %}
+{% block page_title %}Time Tracker{% endblock %}
+
+{% block header_actions %}
+<button onclick="document.getElementById('addTimeModal').classList.remove('hidden')"
+        class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2">
+  <i class="fas fa-plus"></i> Log Time
+</button>
+{% endblock %}
+
+{% block content %}
+{% if success %}
+<div class="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm" data-flash>
+  <i class="fas fa-circle-check"></i> Time entry added.
+</div>
+{% endif %}
+
+<!-- Stats row -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+  <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+    <p class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Unbilled Hours</p>
+    <p class="text-2xl font-bold text-indigo-700">{{ "%.1f"|format(unbilled|sum(attribute='hours')) }}</p>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+    <p class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Unbilled Value</p>
+    <p class="text-2xl font-bold text-emerald-600">${{ "%.2f"|format(total_unbilled) }}</p>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+    <p class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Total Entries</p>
+    <p class="text-2xl font-bold text-slate-700">{{ logs|length }}</p>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+    <p class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Billed Entries</p>
+    <p class="text-2xl font-bold text-slate-400">{{ logs|selectattr('invoiced')|list|length }}</p>
+  </div>
+</div>
+
+<!-- Convert unbilled to invoice -->
+{% if unbilled %}
+<div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-5">
+  <form method="POST" action="/time/convert-to-invoice" class="flex flex-wrap items-center gap-3">
+    <input type="hidden" name="log_ids" id="selectedIds"/>
+    <span class="text-sm font-semibold text-indigo-700">Convert selected to invoice:</span>
+    <input type="date" name="due_date" value="{{ (logs[0].log_date.isoformat()) if logs else today }}"
+           class="border border-indigo-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"/>
+    <button type="submit" onclick="setSelectedIds()" id="convertBtn"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-1.5 rounded-lg disabled:opacity-40">
+      <i class="fas fa-file-invoice"></i> Create Invoice
+    </button>
+    <button type="button" onclick="selectAllUnbilled()"
+            class="text-indigo-600 text-sm hover:underline">Select all unbilled</button>
+  </form>
+</div>
+{% endif %}
+
+<!-- Time log table -->
+{% if logs %}
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-50 border-b border-slate-200">
+      <tr>
+        <th class="px-4 py-3 w-8">
+          <input type="checkbox" class="accent-indigo-600" onchange="toggleAllUnbilled(this)"/>
+        </th>
+        <th class="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Date</th>
+        <th class="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Description</th>
+        <th class="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase hidden md:table-cell">Client</th>
+        <th class="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Hours</th>
+        <th class="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Rate</th>
+        <th class="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Amount</th>
+        <th class="text-center px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Status</th>
+        <th class="px-4 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for log in logs %}
+      <tr class="hover:bg-slate-50 {% if log.invoiced %}opacity-50{% endif %}">
+        <td class="px-4 py-3">
+          {% if not log.invoiced %}
+          <input type="checkbox" class="time-check accent-indigo-600" value="{{ log.id }}"/>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 text-slate-500 whitespace-nowrap">{{ log.log_date.strftime('%b %d, %Y') }}</td>
+        <td class="px-4 py-3 text-slate-800 font-medium">{{ log.description }}</td>
+        <td class="px-4 py-3 text-slate-500 hidden md:table-cell">{{ log.client.name if log.client else "—" }}</td>
+        <td class="px-4 py-3 text-right font-mono text-slate-700">{{ "%.1f"|format(log.hours) }}h</td>
+        <td class="px-4 py-3 text-right text-slate-500">${{ "%.2f"|format(log.rate) }}</td>
+        <td class="px-4 py-3 text-right font-bold text-slate-800">${{ "%.2f"|format(log.amount) }}</td>
+        <td class="px-4 py-3 text-center">
+          {% if log.invoiced %}
+          <span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">Billed</span>
+          {% else %}
+          <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Unbilled</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 text-right">
+          {% if not log.invoiced %}
+          <form method="POST" action="/time/{{ log.id }}/delete" class="inline"
+                onsubmit="return confirm('Delete this time entry?')">
+            <button type="submit" class="text-slate-400 hover:text-red-500 text-sm"><i class="fas fa-trash"></i></button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="text-center py-20 text-slate-400">
+  <p class="text-5xl mb-3">⏱️</p>
+  <p class="text-lg font-medium text-slate-600">No time logged yet</p>
+  <p class="text-sm mt-1 mb-4">Track hours, then convert to invoice in one click.</p>
+</div>
+{% endif %}
+
+<!-- Add Time Modal -->
+<div id="addTimeModal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="text-lg font-bold">Log Time</h3>
+      <button onclick="document.getElementById('addTimeModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
+    </div>
+    <form method="POST" action="/time/add" class="space-y-3">
+      <div>
+        <label class="flabel">Date</label>
+        <input name="log_date" type="date" value="{{ today }}" class="finput" required/>
+      </div>
+      <div>
+        <label class="flabel">Description <span class="text-red-400">*</span></label>
+        <input name="description" type="text" required class="finput" placeholder="e.g. Homepage design"/>
+      </div>
+      <div>
+        <label class="flabel">Client</label>
+        <select name="client_id" class="finput bg-white">
+          <option value="">— No client —</option>
+          {% for c in clients %}
+          <option value="{{ c.id }}">{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="flabel">Hours <span class="text-red-400">*</span></label>
+          <input name="hours" type="number" step="0.25" min="0.25" required class="finput" placeholder="2.5"/>
+        </div>
+        <div>
+          <label class="flabel">Hourly Rate ($)</label>
+          <input name="rate" type="number" step="0.01" min="0" class="finput" placeholder="75.00"/>
+        </div>
+      </div>
+      <div class="flex gap-3 pt-1">
+        <button type="button" onclick="document.getElementById('addTimeModal').classList.add('hidden')"
+                class="flex-1 border border-slate-300 rounded-lg py-2.5 text-sm text-slate-600">Cancel</button>
+        <button type="submit" class="flex-1 bg-indigo-600 text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-indigo-700">Log Time</button>
+      </div>
+    </form>
+  </div>
+</div>
+<style>
+.flabel{display:block;font-size:.68rem;font-weight:700;color:#64748b;margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.06em}
+.finput{width:100%;border:1px solid #e2e8f0;border-radius:.5rem;padding:.6rem .75rem;font-size:.875rem;outline:none}
+.finput:focus{box-shadow:0 0 0 2px #a5b4fc;border-color:#818cf8}
+</style>
+{% endblock %}
+{% block scripts %}
+<script>
+function toggleAllUnbilled(cb) {
+  document.querySelectorAll('.time-check').forEach(c => c.checked = cb.checked);
+}
+function selectAllUnbilled() {
+  document.querySelectorAll('.time-check').forEach(c => c.checked = true);
+}
+function setSelectedIds() {
+  const ids = [...document.querySelectorAll('.time-check:checked')].map(c => c.value);
+  document.getElementById('selectedIds').value = ids.join(',');
+  return ids.length > 0;
+}
+</script>
+{% endblock %}

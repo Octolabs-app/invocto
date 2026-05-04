@@ -64,6 +64,14 @@
          {% if '/estimates' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
         <i class="fas fa-file-contract w-4 text-center text-[11px]"></i> Estimates
       </a>
+      <a href="/recurring/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
+         {% if '/recurring' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+        <i class="fas fa-rotate w-4 text-center text-[11px]"></i> Recurring
+      </a>
+      <a href="/time/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
+         {% if path.startswith('/time') %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+        <i class="fas fa-clock w-4 text-center text-[11px]"></i> Time Tracker
+      </a>
       <a href="/items/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
          {% if '/items' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
         <i class="fas fa-box-archive w-4 text-center text-[11px]"></i> Item Library

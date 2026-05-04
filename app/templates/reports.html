@@ -15,29 +15,70 @@
 
 {% block content %}
 
-<!-- Year picker -->
-<div class="flex items-center gap-3 mb-6 flex-wrap">
-  <span class="text-sm font-semibold text-slate-600">Tax Year:</span>
-  {% for y in year_range %}
-  <a href="/reports/?year={{ y }}"
-     class="px-4 py-1.5 rounded-full text-sm font-semibold border transition-colors
-            {% if y == year %}bg-indigo-600 text-white border-indigo-600 shadow-sm{% else %}border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-600{% endif %}">
-    {{ y }}
-  </a>
-  {% endfor %}
+<!-- ── Year + Country selector row ──────────────────────────────────────── -->
+<div class="flex flex-wrap items-start gap-4 mb-6">
+  <!-- Year pills -->
+  <div class="flex items-center gap-2 flex-wrap">
+    <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">Year:</span>
+    {% for y in year_range %}
+    <a href="/reports/?year={{ y }}"
+       class="px-3 py-1.5 rounded-full text-sm font-semibold border transition-colors
+              {% if y == year %}bg-indigo-600 text-white border-indigo-600{% else %}border-slate-300 text-slate-600 hover:border-indigo-400{% endif %}">
+      {{ y }}
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Country + tax rate form -->
+  <form method="POST" action="/reports/set-country" class="flex flex-wrap items-center gap-2 ml-auto">
+    <input type="hidden" name="year" value="{{ year }}"/>
+    <select name="country" onchange="updateTaxRate(this.value)"
+            class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      {% for code, name in country_choices %}
+      <option value="{{ code }}" {% if code == country_code %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
+    <div id="customRateWrap" class="{% if country_code != 'OTHER' %}hidden{% endif %} flex items-center gap-1">
+      <input name="custom_tax_rate" type="number" step="0.5" min="0" max="70"
+             value="{{ profile.custom_tax_rate if profile else 25 }}"
+             class="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-400"/>
+      <span class="text-sm text-slate-500">%</span>
+    </div>
+    <button type="submit"
+            class="bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
+      Apply
+    </button>
+  </form>
 </div>
 
-<!-- Disclaimer -->
-<div class="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-sm mb-6">
-  <i class="fas fa-triangle-exclamation mt-0.5 shrink-0"></i>
-  <div>
-    <strong>Estimate only.</strong> The 25% tax rate is a rough guideline.
-    Your actual liability depends on your location, deductions, and bracket.
-    <strong>Only USD invoices are summed below</strong> — non-USD invoices are listed separately for manual conversion.
+<!-- ── Country info banner ─────────────────────────────────────────────── -->
+<div class="bg-indigo-50 border border-indigo-200 rounded-xl px-5 py-3.5 mb-5 flex flex-wrap items-center justify-between gap-3">
+  <div class="flex items-center gap-3">
+    <div class="w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600 text-sm font-bold">
+      {{ country_info.name[:2].upper() }}
+    </div>
+    <div>
+      <p class="font-semibold text-indigo-800 text-sm">{{ country_info.name }} — {{ country_info.type }}</p>
+      <p class="text-xs text-indigo-500">{{ country_info.filing_freq }}</p>
+    </div>
+  </div>
+  <div class="flex items-center gap-3 text-sm">
+    {% if country_info.vat > 0 %}
+    <span class="bg-white border border-indigo-200 text-indigo-700 text-xs font-bold px-2.5 py-1 rounded-full">
+      {{ country_info.vat_name }}: {{ country_info.vat }}%
+    </span>
+    {% endif %}
+    <span class="bg-indigo-600 text-white text-xs font-bold px-2.5 py-1 rounded-full">
+      Est. tax rate: {{ tax_rate }}%
+    </span>
+    {% if country_info.authority_url %}
+    <a href="{{ country_info.authority_url }}" target="_blank"
+       class="text-indigo-600 hover:underline text-xs">{{ country_info.authority }} ↗</a>
+    {% endif %}
   </div>
 </div>
 
-<!-- Summary cards -->
+<!-- ── Summary cards ──────────────────────────────────────────────────── -->
 <div class="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
   <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
     <p class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Total Income (USD)</p>
@@ -57,18 +98,16 @@
     <p class="text-xs text-slate-400 mt-1">Income − expenses</p>
   </div>
   <div class="bg-red-50 rounded-xl border border-red-200 shadow-sm p-5">
-    <p class="text-xs font-bold text-red-400 uppercase tracking-wide mb-1">Est. Tax (25%)</p>
+    <p class="text-xs font-bold text-red-400 uppercase tracking-wide mb-1">Est. Tax ({{ tax_rate }}%)</p>
     <p class="text-2xl font-bold text-red-600">${{ "%.2f"|format(estimated_tax) }}</p>
-    <p class="text-xs text-red-400 mt-1">Set this aside!</p>
+    <p class="text-xs text-red-400 mt-1">{{ country_info.name }} rate — set aside!</p>
   </div>
 </div>
 
-<!-- Non-USD income notice -->
+<!-- Non-USD notice -->
 {% if other_by_currency %}
 <div class="bg-indigo-50 border border-indigo-200 rounded-xl px-5 py-4 mb-6">
-  <p class="text-sm font-semibold text-indigo-700 mb-2 flex items-center gap-2">
-    <i class="fas fa-globe text-indigo-400"></i> Non-USD Income (not included in totals above — convert manually)
-  </p>
+  <p class="text-sm font-semibold text-indigo-700 mb-2"><i class="fas fa-globe text-indigo-400 mr-1"></i> Non-USD income (not summed above — convert manually)</p>
   <div class="flex flex-wrap gap-4">
     {% for cur, amt in other_by_currency.items() %}
     <div class="bg-white rounded-lg border border-indigo-100 px-4 py-2">
@@ -80,31 +119,25 @@
 </div>
 {% endif %}
 
-<!-- Charts row -->
+<!-- Quarterly + Expenses grid -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
 
-  <!-- Quarterly -->
   <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
     <h3 class="font-bold text-slate-700 mb-4">Income by Quarter — {{ year }} <span class="text-xs text-slate-400 font-normal">(USD only)</span></h3>
-    {% set q_months = {1: "Jan–Mar", 2: "Apr–Jun", 3: "Jul–Sep", 4: "Oct–Dec"} %}
     <div class="space-y-4">
       {% for q in range(1, 5) %}
       <div class="flex items-center gap-3">
-        <div class="w-20 shrink-0">
+        <div class="w-24 shrink-0">
           <p class="text-xs font-bold text-slate-700">Q{{ q }}</p>
-          <p class="text-xs text-slate-400">{{ q_months[q] }}</p>
+          <p class="text-xs text-slate-400">{{ quarter_labels[q] }}</p>
         </div>
         <div class="flex-1 bg-slate-100 rounded-full h-2.5 overflow-hidden">
           {% if total_income > 0 %}
-          <div class="h-2.5 rounded-full bg-indigo-500 transition-all"
-               style="width:{{ [(quarterly[q] / total_income * 100), 100] | min | int }}%"></div>
-          {% else %}
-          <div class="h-2.5 w-0"></div>
+          <div class="h-2.5 rounded-full bg-indigo-500"
+               style="width:{{ [(quarterly[q] / total_income * 100), 100]|min|int }}%"></div>
           {% endif %}
         </div>
-        <p class="text-sm font-bold text-slate-800 w-24 text-right shrink-0">
-          ${{ "%.2f"|format(quarterly[q]) }}
-        </p>
+        <p class="text-sm font-bold text-slate-800 w-24 text-right shrink-0">${{ "%.2f"|format(quarterly[q]) }}</p>
       </div>
       {% endfor %}
     </div>
@@ -114,16 +147,13 @@
     </div>
   </div>
 
-  <!-- Expenses by category -->
   <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
     <h3 class="font-bold text-slate-700 mb-4">Expenses by Category — {{ year }}</h3>
     {% if expenses %}
       {% set ns = namespace(cat={}) %}
-      {% for e in expenses %}
-        {% set _ = ns.cat.update({e.category: (ns.cat.get(e.category, 0) + e.amount)}) %}
-      {% endfor %}
+      {% for e in expenses %}{% set _ = ns.cat.update({e.category: (ns.cat.get(e.category, 0) + e.amount)}) %}{% endfor %}
       <div class="space-y-3">
-        {% for cat, amt in ns.cat.items() | sort(attribute='1', reverse=True) %}
+        {% for cat, amt in ns.cat.items()|sort(attribute='1', reverse=True) %}
         <div class="flex items-center gap-3">
           <span class="w-2.5 h-2.5 rounded-full bg-indigo-400 shrink-0"></span>
           <span class="text-sm text-slate-700 flex-1">{{ cat }}</span>
@@ -132,30 +162,50 @@
         {% endfor %}
       </div>
       <div class="mt-4 pt-4 border-t border-slate-200 flex justify-between">
-        <span class="text-sm font-bold text-slate-600">Total Expenses</span>
+        <span class="text-sm font-bold text-slate-600">Total</span>
         <span class="text-sm font-bold text-slate-800">${{ "%.2f"|format(total_expenses) }}</span>
       </div>
     {% else %}
-      <div class="flex flex-col items-center justify-center py-10 text-slate-300">
-        <i class="fas fa-receipt text-4xl mb-3"></i>
-        <p class="text-sm text-slate-400">No expenses recorded for {{ year }}</p>
-        <a href="/expenses/" class="mt-2 text-indigo-500 text-xs hover:underline">Add expenses →</a>
+      <div class="text-center py-8 text-slate-400">
+        <i class="fas fa-receipt text-3xl mb-2"></i>
+        <p class="text-sm">No expenses for {{ year }}</p>
+        <a href="/expenses/" class="mt-1 inline-block text-indigo-500 text-xs hover:underline">Add expenses →</a>
       </div>
     {% endif %}
   </div>
 </div>
 
-<!-- USD Paid invoices table -->
+<!-- Country-specific Tax FAQ -->
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-6">
+  <div class="flex items-center gap-3 mb-5">
+    <div class="w-8 h-8 bg-amber-100 text-amber-700 rounded-lg flex items-center justify-center text-sm">❓</div>
+    <h3 class="font-bold text-slate-700">Tax FAQ — {{ country_info.name }}</h3>
+  </div>
+  <div class="space-y-3">
+    {% for question, answer in country_info.faq %}
+    <details class="group border border-slate-100 rounded-xl">
+      <summary class="flex items-center justify-between px-5 py-3.5 cursor-pointer font-medium text-slate-700 text-sm list-none">
+        {{ question }}
+        <i class="fas fa-chevron-down text-slate-400 text-xs group-open:rotate-180 transition-transform"></i>
+      </summary>
+      <p class="px-5 pb-4 text-sm text-slate-500 leading-relaxed">{{ answer }}</p>
+    </details>
+    {% endfor %}
+  </div>
+  {% if country_info.notes %}
+  <div class="mt-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+    <p class="text-xs font-bold text-amber-700 uppercase tracking-wide mb-1">Key Note</p>
+    <p class="text-sm text-amber-800">{{ country_info.notes }}</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Paid invoices -->
 {% if usd_invoices %}
 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-5">
   <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-    <div>
-      <h3 class="font-bold text-slate-700">Paid USD Invoices — {{ year }}</h3>
-      <p class="text-xs text-slate-400 mt-0.5">Included in the tax calculation above</p>
-    </div>
-    <span class="bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full">
-      {{ usd_invoices|length }} invoice{{ "s" if usd_invoices|length != 1 }}
-    </span>
+    <h3 class="font-bold text-slate-700">Paid USD Invoices — {{ year }}</h3>
+    <span class="bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full">{{ usd_invoices|length }} invoice{{ "s" if usd_invoices|length != 1 }}</span>
   </div>
   <div class="overflow-x-auto">
     <table class="w-full text-sm">
@@ -164,7 +214,7 @@
           <th class="text-left px-5 py-3 font-semibold text-slate-500 text-xs uppercase">Date Paid</th>
           <th class="text-left px-5 py-3 font-semibold text-slate-500 text-xs uppercase">Invoice #</th>
           <th class="text-left px-5 py-3 font-semibold text-slate-500 text-xs uppercase">Client</th>
-          <th class="text-left px-5 py-3 font-semibold text-slate-500 text-xs uppercase">Category</th>
+          <th class="text-left px-5 py-3 font-semibold text-slate-500 text-xs uppercase hidden md:table-cell">Category</th>
           <th class="text-right px-5 py-3 font-semibold text-slate-500 text-xs uppercase">Amount</th>
         </tr>
       </thead>
@@ -174,30 +224,21 @@
           <td class="px-5 py-3 text-slate-500">{{ inv.payment_date.strftime('%b %d, %Y') }}</td>
           <td class="px-5 py-3 font-mono text-xs text-slate-500">{{ inv.invoice_number }}</td>
           <td class="px-5 py-3 font-medium text-slate-800">{{ inv.client.name }}</td>
-          <td class="px-5 py-3">
-            <span class="bg-indigo-50 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">{{ inv.category }}</span>
-          </td>
+          <td class="px-5 py-3 hidden md:table-cell"><span class="bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded-full">{{ inv.category }}</span></td>
           <td class="px-5 py-3 text-right font-bold text-slate-800">USD {{ "%.2f"|format(inv.total) }}</td>
         </tr>
         {% endfor %}
       </tbody>
-      <tfoot class="border-t-2 border-slate-300 bg-slate-50">
-        <tr>
-          <td colspan="4" class="px-5 py-3 font-bold text-slate-700 text-right">Total</td>
-          <td class="px-5 py-3 font-bold text-right text-slate-800">USD {{ "%.2f"|format(total_income) }}</td>
-        </tr>
-      </tfoot>
     </table>
   </div>
 </div>
 {% endif %}
 
-<!-- Non-USD invoices -->
 {% if other_invoices %}
 <div class="bg-white rounded-xl border border-indigo-100 shadow-sm overflow-hidden">
   <div class="px-6 py-4 border-b border-indigo-100 bg-indigo-50/50">
     <h3 class="font-bold text-indigo-700">Non-USD Invoices — {{ year }}</h3>
-    <p class="text-xs text-indigo-400 mt-0.5">Convert these to USD and add to your totals manually</p>
+    <p class="text-xs text-indigo-400 mt-0.5">Convert to USD and add to your totals manually</p>
   </div>
   <div class="overflow-x-auto">
     <table class="w-full text-sm">
@@ -206,7 +247,6 @@
           <th class="text-left px-5 py-3 font-semibold text-slate-500 text-xs uppercase">Date Paid</th>
           <th class="text-left px-5 py-3 font-semibold text-slate-500 text-xs uppercase">Invoice #</th>
           <th class="text-left px-5 py-3 font-semibold text-slate-500 text-xs uppercase">Client</th>
-          <th class="text-left px-5 py-3 font-semibold text-slate-500 text-xs uppercase">Category</th>
           <th class="text-right px-5 py-3 font-semibold text-slate-500 text-xs uppercase">Amount</th>
         </tr>
       </thead>
@@ -216,9 +256,6 @@
           <td class="px-5 py-3 text-slate-500">{{ inv.payment_date.strftime('%b %d, %Y') }}</td>
           <td class="px-5 py-3 font-mono text-xs text-slate-500">{{ inv.invoice_number }}</td>
           <td class="px-5 py-3 font-medium text-slate-800">{{ inv.client.name }}</td>
-          <td class="px-5 py-3">
-            <span class="bg-indigo-50 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">{{ inv.category }}</span>
-          </td>
           <td class="px-5 py-3 text-right font-bold text-indigo-600">
             {{ inv.currency }} {{ "%.2f"|format(inv.total) }}
             <span class="block text-xs text-slate-400 font-normal">convert manually</span>
@@ -232,11 +269,21 @@
 {% endif %}
 
 {% if not usd_invoices and not other_invoices %}
-<div class="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center text-slate-400">
+<div class="bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-400">
   <i class="fas fa-file-invoice text-4xl mb-3"></i>
   <p class="text-slate-500 font-medium">No paid invoices found for {{ year }}</p>
   <a href="/invoices/" class="mt-2 inline-block text-indigo-500 text-sm hover:underline">Go to invoices →</a>
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+const RATES = {{ country_rates | tojson }};
+function updateTaxRate(code) {
+  const wrap = document.getElementById('customRateWrap');
+  wrap.classList.toggle('hidden', code !== 'OTHER');
+}
+</script>
 {% endblock %}

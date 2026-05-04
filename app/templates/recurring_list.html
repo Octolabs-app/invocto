@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Recurring Invoices{% endblock %}
+{% block page_title %}Recurring Invoices{% endblock %}
+
+{% block header_actions %}
+<a href="/recurring/new" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2">
+  <i class="fas fa-plus"></i> New Recurring
+</a>
+{% endblock %}
+
+{% block content %}
+{% if success %}<div class="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm" data-flash>✅ Recurring invoice {{ success }}.</div>{% endif %}
+
+<div class="mb-4 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 text-sm text-indigo-700 flex items-center gap-2">
+  <i class="fas fa-robot text-indigo-400"></i>
+  The scheduler automatically creates invoices on the next due date every day at 07:00 UTC. You can pause any recurring any time.
+</div>
+
+{% if recurrings %}
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-50 border-b border-slate-200">
+      <tr>
+        <th class="text-left px-5 py-3 font-semibold text-slate-600 text-xs uppercase">Client</th>
+        <th class="text-left px-5 py-3 font-semibold text-slate-600 text-xs uppercase hidden md:table-cell">Frequency</th>
+        <th class="text-left px-5 py-3 font-semibold text-slate-600 text-xs uppercase">Next Date</th>
+        <th class="text-right px-5 py-3 font-semibold text-slate-600 text-xs uppercase">Value</th>
+        <th class="text-center px-5 py-3 font-semibold text-slate-600 text-xs uppercase">Status</th>
+        <th class="text-right px-5 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for rec in recurrings %}
+      <tr class="hover:bg-slate-50 {% if not rec.active %}opacity-50{% endif %}">
+        <td class="px-5 py-3 font-semibold text-slate-800">{{ rec.client.name }}</td>
+        <td class="px-5 py-3 text-slate-500 hidden md:table-cell capitalize">{{ rec.frequency }}</td>
+        <td class="px-5 py-3 {% if rec.next_date <= today and rec.active %}text-amber-600 font-semibold{% else %}text-slate-500{% endif %}">
+          {{ rec.next_date.strftime('%b %d, %Y') }}
+          {% if rec.next_date <= today and rec.active %}<span class="text-xs ml-1">(due!)</span>{% endif %}
+        </td>
+        <td class="px-5 py-3 text-right font-bold text-slate-800">
+          {{ rec.currency }} {{ "%.2f"|format(rec.line_items|sum(attribute='unit_price')) }}
+        </td>
+        <td class="px-5 py-3 text-center">
+          {% if rec.active %}
+          <span class="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-full">Active</span>
+          {% else %}
+          <span class="bg-slate-100 text-slate-500 text-xs font-bold px-2.5 py-1 rounded-full">Paused</span>
+          {% endif %}
+        </td>
+        <td class="px-5 py-3 text-right">
+          <div class="flex items-center justify-end gap-2">
+            <form method="POST" action="/recurring/{{ rec.id }}/toggle">
+              <button type="submit" class="text-xs border border-slate-300 px-2.5 py-1 rounded-lg text-slate-600 hover:bg-slate-50">
+                {{ "Pause" if rec.active else "Resume" }}
+              </button>
+            </form>
+            <form method="POST" action="/recurring/{{ rec.id }}/delete" onsubmit="return confirm('Delete this recurring invoice?')">
+              <button type="submit" class="text-slate-400 hover:text-red-500"><i class="fas fa-trash text-sm"></i></button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="text-center py-20 text-slate-400">
+  <p class="text-5xl mb-3">🔁</p>
+  <p class="text-lg font-medium text-slate-600">No recurring invoices</p>
+  <p class="text-sm mt-1 mb-4">Set up monthly retainers — invoices generate automatically.</p>
+  <a href="/recurring/new" class="inline-flex items-center gap-2 bg-indigo-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-indigo-700">
+    <i class="fas fa-plus"></i> Create first recurring
+  </a>
+</div>
+{% endif %}
+{% endblock %}

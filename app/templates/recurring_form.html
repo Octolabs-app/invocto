@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}New Recurring Invoice{% endblock %}
+{% block page_title %}New Recurring Invoice{% endblock %}
+
+{% block header_actions %}
+<button onclick="document.getElementById('recurringForm').submit()"
+        class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2 rounded-lg flex items-center gap-2">
+  <i class="fas fa-save"></i> Save Recurring
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto space-y-4">
+<form id="recurringForm" method="POST" action="/recurring/new">
+
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+    <h3 class="font-semibold text-slate-700 mb-4">Recurring Settings</h3>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="col-span-2">
+        <label class="flabel">Client <span class="text-red-400">*</span></label>
+        <select name="client_id" required class="finput bg-white">
+          {% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="flabel">Frequency</label>
+        <select name="frequency" class="finput bg-white">
+          {% for f in frequencies %}<option value="{{ f }}" {% if f == "monthly" %}selected{% endif %}>{{ f|capitalize }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="flabel">Currency</label>
+        <select name="currency" class="finput bg-white">
+          {% for c in currencies %}<option value="{{ c }}" {% if c == "USD" %}selected{% endif %}>{{ c }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="flabel">First Invoice Date <span class="text-red-400">*</span></label>
+        <input name="next_date" type="date" required class="finput" value="{{ today }}"/>
+      </div>
+      <div>
+        <label class="flabel">End Date (optional)</label>
+        <input name="end_date" type="date" class="finput"/>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-semibold text-slate-700">Line Items</h3>
+      <button type="button" onclick="addRow()" class="text-indigo-600 text-sm font-medium flex items-center gap-1"><i class="fas fa-plus-circle"></i> Add</button>
+    </div>
+    <div id="rows" class="space-y-2">
+      <div class="row grid grid-cols-12 gap-1 items-center">
+        <input name="description[]" type="text" oninput="calcRow(this)" placeholder="Service description" class="col-span-12 sm:col-span-6 finput text-sm"/>
+        <input name="quantity[]" type="number" step="0.01" min="0" value="1" oninput="calcRow(this)" class="col-span-4 sm:col-span-2 finput text-sm text-center"/>
+        <input name="unit_price[]" type="number" step="0.01" min="0" value="0" oninput="calcRow(this)" class="col-span-5 sm:col-span-2 finput text-sm text-right"/>
+        <div class="col-span-3 sm:col-span-2 flex items-center justify-end gap-1">
+          <span class="row-total text-sm font-bold text-indigo-700 min-w-[50px] text-right">0.00</span>
+          <button type="button" onclick="removeRow(this)" class="text-slate-300 hover:text-red-500 text-lg ml-1">&times;</button>
+        </div>
+      </div>
+    </div>
+    <div class="flex justify-end mt-3 pt-3 border-t border-slate-200">
+      <div class="text-right">
+        <p class="text-xs text-slate-400 uppercase font-semibold">Monthly Total</p>
+        <p id="grand" class="text-xl font-bold text-indigo-700">0.00</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+    <label class="flabel">Notes / Payment Instructions</label>
+    <textarea name="payment_note" rows="3" class="finput" placeholder="Bank details, payment terms…"></textarea>
+  </div>
+
+</form>
+</div>
+<style>
+.flabel{display:block;font-size:.68rem;font-weight:700;color:#64748b;margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.06em}
+.finput{width:100%;border:1px solid #e2e8f0;border-radius:.5rem;padding:.6rem .75rem;font-size:.875rem;outline:none}
+.finput:focus{box-shadow:0 0 0 2px #a5b4fc;border-color:#818cf8}
+</style>
+{% endblock %}
+{% block scripts %}
+<script>
+function calcRow(inp){const r=inp.closest('.row');const q=parseFloat(r.querySelector('[name="quantity[]"]').value)||0;const p=parseFloat(r.querySelector('[name="unit_price[]"]').value)||0;r.querySelector('.row-total').textContent=(q*p).toFixed(2);let s=0;document.querySelectorAll('.row-total').forEach(e=>s+=parseFloat(e.textContent)||0);document.getElementById('grand').textContent=s.toFixed(2);}
+function addRow(){const d=document.createElement('div');d.className='row grid grid-cols-12 gap-1 items-center';d.innerHTML=`<input name="description[]" type="text" oninput="calcRow(this)" placeholder="Service" class="col-span-12 sm:col-span-6 finput text-sm"/><input name="quantity[]" type="number" step="0.01" min="0" value="1" oninput="calcRow(this)" class="col-span-4 sm:col-span-2 finput text-sm text-center"/><input name="unit_price[]" type="number" step="0.01" min="0" value="0" oninput="calcRow(this)" class="col-span-5 sm:col-span-2 finput text-sm text-right"/><div class="col-span-3 sm:col-span-2 flex items-center justify-end gap-1"><span class="row-total text-sm font-bold text-indigo-700 min-w-[50px] text-right">0.00</span><button type="button" onclick="removeRow(this)" class="text-slate-300 hover:text-red-500 text-lg ml-1">&times;</button></div>`;document.getElementById('rows').appendChild(d);}
+function removeRow(b){if(document.querySelectorAll('.row').length<=1)return;b.closest('.row').remove();let s=0;document.querySelectorAll('.row-total').forEach(e=>s+=parseFloat(e.textContent)||0);document.getElementById('grand').textContent=s.toFixed(2);}
+</script>
+{% endblock %}

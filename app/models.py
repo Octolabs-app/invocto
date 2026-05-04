@@ -38,6 +38,9 @@ class UserProfile(Base):
     plan                   = Column(String(20), default="free")
     stripe_customer_id     = Column(String(100))
     stripe_subscription_id = Column(String(100))
+    country                = Column(String(10), default="OTHER")
+    custom_tax_rate        = Column(Float, default=25.0)
+    late_fee_pct           = Column(Float, default=0.0)
     plan_expires_at        = Column(DateTime)
     created_at             = Column(DateTime, default=datetime.utcnow)
     updated_at             = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -74,20 +77,39 @@ class Invoice(Base):
     payment_date   = Column(Date)
     currency       = Column(String(10), default="USD")
     category       = Column(String(50), default="Other")
-    notes          = Column(Text)
-    template       = Column(String(20), default="minimal")
-    is_template    = Column(Boolean, default=False)
-    template_name  = Column(String(100))
-    payment_note   = Column(Text)
-    created_at     = Column(DateTime, default=datetime.utcnow)
+    notes              = Column(Text)
+    template           = Column(String(20), default="minimal")
+    is_template        = Column(Boolean, default=False)
+    template_name      = Column(String(100))
+    payment_note       = Column(Text)
+    discount_pct       = Column(Float, default=0.0)
+    tax_rate           = Column(Float, default=0.0)
+    late_fee_amount    = Column(Float, default=0.0)
+    view_token         = Column(String(40))
+    last_sent_at       = Column(DateTime)
+    reminders_enabled  = Column(Boolean, default=True)
+    created_at         = Column(DateTime, default=datetime.utcnow)
 
     user       = relationship("User",     back_populates="invoices")
     client     = relationship("Client",   back_populates="invoices")
     line_items = relationship("LineItem", back_populates="invoice", cascade="all, delete-orphan")
 
     @property
+    def subtotal(self):
+        return round(sum(item.quantity * item.unit_price for item in self.line_items), 2)
+
+    @property
+    def discount_amount(self):
+        return round(self.subtotal * (self.discount_pct or 0) / 100, 2)
+
+    @property
+    def tax_amount(self):
+        after_discount = self.subtotal - self.discount_amount
+        return round(after_discount * (self.tax_rate or 0) / 100, 2)
+
+    @property
     def total(self):
-        return sum(item.quantity * item.unit_price for item in self.line_items)
+        return round(self.subtotal - self.discount_amount + self.tax_amount + (self.late_fee_amount or 0), 2)
 
     @property
     def is_overdue(self):
@@ -210,3 +232,47 @@ class RecurringLineItem(Base):
     @property
     def line_total(self):
         return self.quantity * self.unit_price
+
+
+class TimeLog(Base):
+    """A billable time entry."""
+    __tablename__ = "time_logs"
+    id          = Column(Integer, primary_key=True, index=True)
+    user_id     = Column(Integer, ForeignKey("users.id"), nullable=False)
+    client_id   = Column(Integer, ForeignKey("clients.id"), nullable=True)
+    description = Column(String(500), nullable=False)
+    hours       = Column(Float, default=0.0)
+    rate        = Column(Float, default=0.0)
+    log_date    = Column(Date, nullable=False)
+    invoiced    = Column(Boolean, default=False)
+    invoice_id  = Column(Integer, ForeignKey("invoices.id"), nullable=True)
+    created_at  = Column(DateTime, default=datetime.utcnow)
+
+    user   = relationship("User")
+    client = relationship("Client")
+
+    @property
+    def amount(self):
+        return round(self.hours * self.rate, 2)
+
+
+class InvoicePayment(Base):
+    """A partial payment recorded against an invoice."""
+    __tablename__ = "invoice_payments"
+    id         = Column(Integer, primary_key=True, index=True)
+    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
+    amount     = Column(Float, nullable=False)
+    paid_date  = Column(Date, nullable=False)
+    note       = Column(String(255))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    invoice = relationship("Invoice")
+
+
+class InvoiceReminder(Base):
+    """Log of sent payment reminders."""
+    __tablename__ = "invoice_reminders"
+    id            = Column(Integer, primary_key=True)
+    invoice_id    = Column(Integer, ForeignKey("invoices.id"), nullable=False)
+    sent_at       = Column(DateTime, default=datetime.utcnow)
+    reminder_type = Column(String(20), default="due_soon")
