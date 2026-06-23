@@ -74,12 +74,16 @@ async def billing_success(request: Request, session_id: str = "", db: Session = 
     if not user:
         return RedirectResponse("/login", status_code=302)
 
-    # Activate pro (webhook will also do this, but this gives instant feedback)
+    # Activate pro (webhook will also do this, but this gives instant feedback).
+    # Verify the checkout session actually belongs to this user's Stripe customer
+    # so a paid session_id can't be replayed to upgrade a different account.
     if session_id and stripe.api_key:
         try:
+            profile = get_or_create_profile(db, user.id)
             session = stripe.checkout.Session.retrieve(session_id)
-            if session.payment_status == "paid":
-                profile = get_or_create_profile(db, user.id)
+            if (session.payment_status == "paid"
+                    and session.customer
+                    and session.customer == profile.stripe_customer_id):
                 profile.plan = "pro"
                 profile.stripe_subscription_id = session.subscription
                 db.commit()
