@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Client, Estimate, EstimateLineItem, Invoice, LineItem, UserProfile
 from ..auth import get_current_user
-from ..routes.invoices import next_invoice_number, _parse_line_items
+from ..routes.invoices import next_invoice_number, _parse_line_items, _owned_client_id
+from ..utils import safe_date, next_sequence_number
 
 router = APIRouter(prefix="/estimates")
 templates = Jinja2Templates(directory="app/templates")
@@ -22,8 +23,9 @@ STATUSES    = ["draft", "sent", "accepted", "declined"]
 
 
 def next_estimate_number(db: Session, user_id: int) -> str:
-    count = db.query(Estimate).filter(Estimate.user_id == user_id).count()
-    return f"EST-{count + 1:04d}"
+    nums = [n for (n,) in db.query(Estimate.estimate_number)
+            .filter(Estimate.user_id == user_id).all()]
+    return next_sequence_number(nums, "EST")
 
 
 def _save_est_items(db, estimate_id, items):
@@ -71,12 +73,14 @@ async def create_estimate(request: Request, db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse("/login", status_code=302)
     form = await request.form()
-    expiry = form.get("expiry_date", "")
+    client_id = _owned_client_id(db, user.id, form.get("client_id"))
+    if client_id is None:
+        return RedirectResponse("/estimates/new?error=client", status_code=302)
     est = Estimate(
         user_id=user.id,
-        client_id=int(form.get("client_id")),
+        client_id=client_id,
         estimate_number=form.get("estimate_number") or next_estimate_number(db, user.id),
-        expiry_date=date.fromisoformat(expiry) if expiry else None,
+        expiry_date=safe_date(form.get("expiry_date")),
         currency=form.get("currency", "USD"),
         category=form.get("category", "Other"),
         notes=form.get("notes", "").strip(),
@@ -116,9 +120,11 @@ async def edit_estimate(est_id: int, request: Request, db: Session = Depends(get
     est = db.query(Estimate).filter(Estimate.id == est_id, Estimate.user_id == user.id).first()
     if est:
         form = await request.form()
-        expiry = form.get("expiry_date", "")
-        est.client_id    = int(form.get("client_id"))
-        est.expiry_date  = date.fromisoformat(expiry) if expiry else None
+        client_id = _owned_client_id(db, user.id, form.get("client_id"))
+        if client_id is None:
+            return RedirectResponse(f"/estimates/{est_id}/edit?error=client", status_code=302)
+        est.client_id    = client_id
+        est.expiry_date  = safe_date(form.get("expiry_date"))
         est.currency     = form.get("currency", "USD")
         est.category     = form.get("category", "Other")
         est.notes        = form.get("notes", "").strip()

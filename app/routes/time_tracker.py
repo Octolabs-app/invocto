@@ -11,6 +11,7 @@ from ..database import get_db
 from ..models import Client, TimeLog, Invoice, LineItem
 from ..auth import get_current_user
 from ..routes.invoices import next_invoice_number
+from ..utils import safe_float, safe_int, safe_date
 
 router = APIRouter(prefix="/time")
 templates = Jinja2Templates(directory="app/templates")
@@ -42,11 +43,11 @@ async def add_time(request: Request, db: Session = Depends(get_db)):
     form = await request.form()
     log = TimeLog(
         user_id     = user.id,
-        client_id   = int(form.get("client_id")) if form.get("client_id") else None,
+        client_id   = safe_int(form.get("client_id")),
         description = form.get("description", "").strip(),
-        hours       = float(form.get("hours", 0)),
-        rate        = float(form.get("rate", 0)),
-        log_date    = date.fromisoformat(form.get("log_date", date.today().isoformat())),
+        hours       = safe_float(form.get("hours"), 0.0),
+        rate        = safe_float(form.get("rate"), 0.0),
+        log_date    = safe_date(form.get("log_date"), date.today()),
     )
     db.add(log); db.commit()
     return RedirectResponse("/time/?success=added", status_code=302)
@@ -82,7 +83,7 @@ async def convert_to_invoice(request: Request, db: Session = Depends(get_db)):
 
     # Group by client — use the first log's client
     client_id = logs[0].client_id
-    due       = date.fromisoformat(form.get("due_date", date.today().isoformat()))
+    due       = safe_date(form.get("due_date"), date.today())
 
     inv = Invoice(
         user_id=user.id, client_id=client_id,

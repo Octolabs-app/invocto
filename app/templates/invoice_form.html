@@ -134,12 +134,38 @@
           </div>
         {% endif %}
       </div>
-      <div class="flex justify-end mt-3 pt-3 border-t border-slate-200">
-        <div class="text-right">
-          <p class="text-xs text-slate-400 uppercase font-semibold tracking-wide">Invoice Total</p>
-          <p id="grand" class="text-2xl font-bold text-indigo-700">
-            {% if invoice %}{{ "%.2f"|format(invoice.total) }}{% else %}0.00{% endif %}
-          </p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3 pt-3 border-t border-slate-200">
+        <!-- Adjustments -->
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="flabel">Discount %</label>
+            <input name="discount_pct" id="f_discount" type="number" step="0.01" min="0" max="100"
+                   value="{{ '%g'|format(invoice.discount_pct) if invoice and invoice.discount_pct else '' }}"
+                   placeholder="0" oninput="recalcTotals()" class="finput text-sm text-right"/>
+          </div>
+          <div>
+            <label class="flabel">Tax %</label>
+            <input name="tax_rate" id="f_tax" type="number" step="0.01" min="0" max="100"
+                   value="{{ '%g'|format(invoice.tax_rate) if invoice and invoice.tax_rate else '' }}"
+                   placeholder="0" oninput="recalcTotals()" class="finput text-sm text-right"/>
+          </div>
+          <div>
+            <label class="flabel">Late fee</label>
+            <input name="late_fee_amount" id="f_latefee" type="number" step="0.01" min="0"
+                   value="{{ '%g'|format(invoice.late_fee_amount) if invoice and invoice.late_fee_amount else '' }}"
+                   placeholder="0" oninput="recalcTotals()" class="finput text-sm text-right"/>
+          </div>
+        </div>
+        <!-- Totals breakdown -->
+        <div class="text-right text-sm space-y-1 self-end">
+          <div class="flex justify-between sm:justify-end gap-6 text-slate-500"><span>Subtotal</span><span id="t_subtotal">0.00</span></div>
+          <div id="t_discount_row" class="flex justify-between sm:justify-end gap-6 text-rose-500 hidden"><span>Discount</span><span id="t_discount">0.00</span></div>
+          <div id="t_tax_row" class="flex justify-between sm:justify-end gap-6 text-slate-500 hidden"><span>Tax</span><span id="t_tax">0.00</span></div>
+          <div id="t_fee_row" class="flex justify-between sm:justify-end gap-6 text-slate-500 hidden"><span>Late fee</span><span id="t_fee">0.00</span></div>
+          <div class="flex justify-between sm:justify-end gap-6 pt-1 border-t border-slate-200">
+            <span class="text-xs text-slate-400 uppercase font-semibold tracking-wide self-center">Total Due</span>
+            <span id="grand" class="text-2xl font-bold text-indigo-700">{% if invoice %}{{ "%.2f"|format(invoice.total) }}{% else %}0.00{% endif %}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -248,6 +274,8 @@ function getState() {
     if (d) rows.push({ d, q, p, t: +(q * p).toFixed(2) });
   });
   const opt = document.querySelector('#f_client option:checked');
+  const subtotal = +(rows.reduce((s, r) => s + r.t, 0)).toFixed(2);
+  const tot = computeTotals(subtotal);
   return {
     number:   (document.getElementById('f_number')?.value || '').trim(),
     client:   opt?.dataset?.name    || '',
@@ -258,8 +286,20 @@ function getState() {
     notes:    document.getElementById('f_notes')?.value?.trim() || '',
     payment:  document.getElementById('f_payment')?.value?.trim() || '',
     rows,
-    total: +(rows.reduce((s, r) => s + r.t, 0)).toFixed(2),
+    ...tot,
   };
+}
+
+// ── Totals math (mirrors the server-side Invoice.total property) ───────────
+function computeTotals(subtotal) {
+  const disc = parseFloat(document.getElementById('f_discount')?.value) || 0;
+  const taxR = parseFloat(document.getElementById('f_tax')?.value) || 0;
+  const fee  = parseFloat(document.getElementById('f_latefee')?.value) || 0;
+  const discount = +(subtotal * disc / 100).toFixed(2);
+  const afterDisc = subtotal - discount;
+  const tax = +(afterDisc * taxR / 100).toFixed(2);
+  const total = +(afterDisc + tax + fee).toFixed(2);
+  return { subtotal, discPct: disc, taxPct: taxR, discount, tax, fee, total };
 }
 
 // ── Build preview HTML ────────────────────────────────────────────────────
@@ -337,6 +377,18 @@ function buildPreview(s, themeName) {
       </thead>
       <tbody>${rowsHtml}</tbody>
       <tfoot>
+        ${ (s.discount > 0 || s.tax > 0 || s.fee > 0) ? `
+        <tr><td colspan="3" style="padding:.3rem .5rem;text-align:right;font-size:.7rem;color:${T.sub};">Subtotal</td>
+            <td style="padding:.3rem .5rem;text-align:right;font-size:.72rem;color:${T.txt};">${s.subtotal.toFixed(2)}</td></tr>` : '' }
+        ${ s.discount > 0 ? `
+        <tr><td colspan="3" style="padding:.3rem .5rem;text-align:right;font-size:.7rem;color:#e24b4a;">Discount (${s.discPct}%)</td>
+            <td style="padding:.3rem .5rem;text-align:right;font-size:.72rem;color:#e24b4a;">-${s.discount.toFixed(2)}</td></tr>` : '' }
+        ${ s.tax > 0 ? `
+        <tr><td colspan="3" style="padding:.3rem .5rem;text-align:right;font-size:.7rem;color:${T.sub};">Tax (${s.taxPct}%)</td>
+            <td style="padding:.3rem .5rem;text-align:right;font-size:.72rem;color:${T.txt};">${s.tax.toFixed(2)}</td></tr>` : '' }
+        ${ s.fee > 0 ? `
+        <tr><td colspan="3" style="padding:.3rem .5rem;text-align:right;font-size:.7rem;color:${T.sub};">Late fee</td>
+            <td style="padding:.3rem .5rem;text-align:right;font-size:.72rem;color:${T.txt};">${s.fee.toFixed(2)}</td></tr>` : '' }
         <tr>
           <td colspan="3" style="padding:.75rem .5rem;text-align:right;font-weight:700;font-size:.75rem;color:${T.sub};letter-spacing:.04em;">TOTAL DUE</td>
           <td style="padding:.75rem .5rem;text-align:right;font-size:1.1rem;font-weight:900;color:${T.accent};">${s.currency} ${s.total.toFixed(2)}</td>
@@ -387,7 +439,20 @@ function calcRow(inp) {
 function updateGrand() {
   let s = 0;
   document.querySelectorAll('.row-total').forEach(e => s += parseFloat(e.textContent) || 0);
-  document.getElementById('grand').textContent = s.toFixed(2);
+  const t = computeTotals(+s.toFixed(2));
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v.toFixed(2); };
+  const show = (id, on) => { const el = document.getElementById(id); if (el) el.classList.toggle('hidden', !on); };
+  set('t_subtotal', t.subtotal);
+  set('t_discount', t.discount); show('t_discount_row', t.discount > 0);
+  set('t_tax', t.tax);           show('t_tax_row', t.tax > 0);
+  set('t_fee', t.fee);           show('t_fee_row', t.fee > 0);
+  set('grand', t.total);
+}
+
+// Recompute totals AND refresh the live preview (used by the adjustment inputs)
+function recalcTotals() {
+  updateGrand();
+  schedulePreview();
 }
 
 function addRow() {

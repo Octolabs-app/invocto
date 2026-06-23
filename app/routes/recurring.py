@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Client, RecurringInvoice, RecurringLineItem
 from ..auth import get_current_user
+from ..utils import safe_float, safe_date
+from ..routes.invoices import _owned_client_id
 
 router = APIRouter(prefix="/recurring")
 templates = Jinja2Templates(directory="app/templates")
@@ -29,8 +31,8 @@ def _parse_line_items(form):
         desc = desc.strip()
         if desc:
             items.append({"description": desc,
-                          "quantity": float(qty) if qty else 1.0,
-                          "unit_price": float(price) if price else 0.0})
+                          "quantity": safe_float(qty, 1.0),
+                          "unit_price": safe_float(price, 0.0)})
     return items
 
 
@@ -71,12 +73,18 @@ async def create_recurring(request: Request, db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse("/login", status_code=302)
     form = await request.form()
+    client_id = _owned_client_id(db, user.id, form.get("client_id"))
+    if client_id is None:
+        return RedirectResponse("/recurring/new?error=client", status_code=302)
+    next_date = safe_date(form.get("next_date"))
+    if next_date is None:
+        return RedirectResponse("/recurring/new?error=next_date", status_code=302)
     rec = RecurringInvoice(
         user_id=user.id,
-        client_id=int(form.get("client_id")),
+        client_id=client_id,
         frequency=form.get("frequency", "monthly"),
-        next_date=date.fromisoformat(form.get("next_date")),
-        end_date=date.fromisoformat(form.get("end_date")) if form.get("end_date") else None,
+        next_date=next_date,
+        end_date=safe_date(form.get("end_date")),
         currency=form.get("currency", "USD"),
         category=form.get("category", "Other"),
         notes=form.get("notes", "").strip(),

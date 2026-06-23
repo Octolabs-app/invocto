@@ -12,7 +12,7 @@ load_dotenv()
 
 from .database import engine, Base
 from . import models  # noqa
-from .auth import router as auth_router, COOKIE_NAME
+from .auth import router as auth_router, COOKIE_NAME, decode_token
 from .routes.dashboard    import router as dashboard_router
 from .routes.clients      import router as clients_router
 from .routes.invoices     import router as invoices_router
@@ -89,6 +89,12 @@ async def require_login_middleware(request: Request, call_next):
         return await call_next(request)
     if path.startswith("/api/") or path.startswith("/items/api/"):
         return await call_next(request)
-    if not request.cookies.get(COOKIE_NAME):
-        return RedirectResponse(url="/login", status_code=302)
+    # Validate the JWT itself (not just the cookie's presence) so an expired or
+    # forged token is rejected at the gate rather than leaking past it.
+    token = request.cookies.get(COOKIE_NAME)
+    if not token or decode_token(token) is None:
+        resp = RedirectResponse(url="/login", status_code=302)
+        if token:
+            resp.delete_cookie(COOKIE_NAME)
+        return resp
     return await call_next(request)

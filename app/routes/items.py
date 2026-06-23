@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Item
 from ..auth import get_current_user
+from ..utils import safe_float
 
 router = APIRouter(prefix="/items")
 templates = Jinja2Templates(directory="app/templates")
@@ -59,7 +60,7 @@ async def add_item(request: Request, db: Session = Depends(get_db)):
         user_id=user.id,
         name=form.get("name", "").strip(),
         description=form.get("description", "").strip() or None,
-        unit_price=float(form.get("unit_price", 0)),
+        unit_price=safe_float(form.get("unit_price"), 0.0),
         unit=form.get("unit", "service"),
         category=form.get("category", "Other"),
     )
@@ -92,7 +93,7 @@ async def edit_item(item_id: int, request: Request, db: Session = Depends(get_db
         form = await request.form()
         item.name        = form.get("name", "").strip()
         item.description = form.get("description", "").strip() or None
-        item.unit_price  = float(form.get("unit_price", 0))
+        item.unit_price  = safe_float(form.get("unit_price"), 0.0)
         item.unit        = form.get("unit", "service")
         item.category    = form.get("category", "Other")
         db.commit()

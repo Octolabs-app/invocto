@@ -43,8 +43,10 @@ def _advance_date(d: date, freq: str) -> date:
 
 
 def _next_invoice_number(db: Session, user_id: int) -> str:
-    count = db.query(Invoice).filter(Invoice.user_id == user_id, Invoice.is_template == False).count()
-    return f"INV-{count + 1:04d}"
+    from .utils import next_sequence_number
+    nums = [n for (n,) in db.query(Invoice.invoice_number)
+            .filter(Invoice.user_id == user_id, Invoice.is_template == False).all()]
+    return next_sequence_number(nums, "INV")
 
 
 async def generate_recurring_invoices():

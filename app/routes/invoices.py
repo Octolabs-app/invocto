@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Client, Invoice, LineItem, UserProfile
 from ..auth import get_current_user
+from ..utils import safe_float, safe_int, safe_date, next_sequence_number
 
 router = APIRouter(prefix="/invoices")
 templates = Jinja2Templates(directory="app/templates")
@@ -45,8 +46,11 @@ async def suggest_category(descriptions: list) -> str:
 
 
 def next_invoice_number(db: Session, user_id: int) -> str:
-    count = db.query(Invoice).filter(Invoice.user_id == user_id, Invoice.is_template == False).count()
-    return f"INV-{count + 1:04d}"
+    # Derive from the highest existing number (not a row count) so deleting an
+    # invoice can never cause the next one to reuse an existing number.
+    nums = [n for (n,) in db.query(Invoice.invoice_number)
+            .filter(Invoice.user_id == user_id, Invoice.is_template == False).all()]
+    return next_sequence_number(nums, "INV")
 
 
 def _parse_line_items(form) -> list:
@@ -55,9 +59,18 @@ def _parse_line_items(form) -> list:
         desc = desc.strip()
         if desc:
             items.append({"description": desc,
-                          "quantity": float(qty) if qty else 1.0,
-                          "unit_price": float(price) if price else 0.0})
+                          "quantity": safe_float(qty, 1.0),
+                          "unit_price": safe_float(price, 0.0)})
     return items
+
+
+def _owned_client_id(db: Session, user_id: int, raw) -> Optional[int]:
+    """Return the client id only if it is a valid int owned by this user."""
+    cid = safe_int(raw)
+    if cid is None:
+        return None
+    exists = db.query(Client.id).filter(Client.id == cid, Client.user_id == user_id).first()
+    return cid if exists else None
 
 
 def _save_line_items(db, invoice_id, items):
@@ -115,19 +128,30 @@ async def create_invoice(request: Request, db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse("/login", status_code=302)
     form = await request.form()
+
+    client_id = _owned_client_id(db, user.id, form.get("client_id"))
+    if client_id is None:
+        return RedirectResponse("/invoices/new?error=client", status_code=302)
+    due_date = safe_date(form.get("due_date"))
+    if due_date is None:
+        return RedirectResponse("/invoices/new?error=due_date", status_code=302)
+
     items = _parse_line_items(form)
     category = await suggest_category([i["description"] for i in items])
     is_template = bool(form.get("save_as_template"))
     invoice = Invoice(
         user_id=user.id,
-        client_id=int(form.get("client_id")),
+        client_id=client_id,
         invoice_number=form.get("invoice_number", "").strip() or next_invoice_number(db, user.id),
-        due_date=date.fromisoformat(form.get("due_date")),
+        due_date=due_date,
         currency=form.get("currency", "USD"),
         category=category,
         notes=form.get("notes", "").strip(),
         template=form.get("template", "minimal"),
         payment_note=form.get("payment_note", "").strip(),
+        discount_pct=safe_float(form.get("discount_pct"), 0.0),
+        tax_rate=safe_float(form.get("tax_rate"), 0.0),
+        late_fee_amount=safe_float(form.get("late_fee_amount"), 0.0),
         is_template=is_template,
         template_name=form.get("template_name", "").strip() if is_template else None,
         status="unpaid",
@@ -167,13 +191,22 @@ async def edit_invoice(invoice_id: int, request: Request, db: Session = Depends(
     if not invoice:
         return RedirectResponse("/invoices/", status_code=302)
     form = await request.form()
-    invoice.client_id    = int(form.get("client_id"))
-    invoice.due_date     = date.fromisoformat(form.get("due_date"))
+    client_id = _owned_client_id(db, user.id, form.get("client_id"))
+    if client_id is None:
+        return RedirectResponse(f"/invoices/{invoice_id}/edit?error=client", status_code=302)
+    due_date = safe_date(form.get("due_date"))
+    if due_date is None:
+        return RedirectResponse(f"/invoices/{invoice_id}/edit?error=due_date", status_code=302)
+    invoice.client_id    = client_id
+    invoice.due_date     = due_date
     invoice.currency     = form.get("currency", "USD")
     invoice.category     = form.get("category", "Other")
     invoice.notes        = form.get("notes", "").strip()
     invoice.template     = form.get("template", "minimal")
     invoice.payment_note = form.get("payment_note", "").strip()
+    invoice.discount_pct    = safe_float(form.get("discount_pct"), 0.0)
+    invoice.tax_rate        = safe_float(form.get("tax_rate"), 0.0)
+    invoice.late_fee_amount = safe_float(form.get("late_fee_amount"), 0.0)
     invoice.is_template  = bool(form.get("save_as_template"))
     invoice.template_name= form.get("template_name", "").strip() if invoice.is_template else None
     for old in invoice.line_items:
@@ -233,6 +266,7 @@ async def duplicate_invoice(invoice_id: int, request: Request, db: Session = Dep
             invoice_number=next_invoice_number(db, user.id),
             due_date=src.due_date, currency=src.currency, category=src.category,
             notes=src.notes, template=src.template, payment_note=src.payment_note,
+            discount_pct=src.discount_pct, tax_rate=src.tax_rate,
             status="unpaid", is_template=False,
         )
         db.add(new_inv); db.flush()

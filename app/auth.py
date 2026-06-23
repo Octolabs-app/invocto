@@ -24,10 +24,20 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 # ── Constants ────────────────────────────────────────────────────────────────
-SECRET_KEY  = os.getenv("SECRET_KEY", "CHANGE-ME-USE-A-RANDOM-SECRET-IN-PRODUCTION")
+_DEFAULT_SECRET = "CHANGE-ME-USE-A-RANDOM-SECRET-IN-PRODUCTION"
+SECRET_KEY  = os.getenv("SECRET_KEY", _DEFAULT_SECRET)
 ALGORITHM   = "HS256"
 COOKIE_NAME = "access_token"
 TOKEN_EXPIRE_DAYS = 7
+
+# Fail hard in production rather than silently signing tokens with a public,
+# well-known default key (which would let anyone forge a session for any user).
+# We treat a non-SQLite DATABASE_URL as "production".
+if SECRET_KEY == _DEFAULT_SECRET and not os.getenv("DATABASE_URL", "sqlite").startswith("sqlite"):
+    raise RuntimeError(
+        "SECRET_KEY is not set. Refusing to start in production with the default "
+        "key — set a strong random SECRET_KEY environment variable."
+    )
 
 # ── Password hashing ──────────────────────────────────────────────────────────
 def verify_password(plain: str, hashed: str) -> bool:

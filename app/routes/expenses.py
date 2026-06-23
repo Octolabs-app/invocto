@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Expense
 from ..auth import get_current_user
+from ..utils import safe_float, safe_date
 
 router = APIRouter(prefix="/expenses")
 templates = Jinja2Templates(directory="app/templates")
@@ -55,11 +56,14 @@ async def add_expense(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse("/login", status_code=302)
 
     form = await request.form()
+    exp_date = safe_date(form.get("date"))
+    if exp_date is None:
+        return RedirectResponse("/expenses/?error=date", status_code=302)
     expense = Expense(
         user_id     = user.id,
-        date        = date.fromisoformat(form.get("date")),
+        date        = exp_date,
         description = form.get("description", "").strip(),
-        amount      = float(form.get("amount", 0)),
+        amount      = safe_float(form.get("amount"), 0.0),
         category    = form.get("category", "Other"),
     )
     db.add(expense)
@@ -102,9 +106,9 @@ async def edit_expense(expense_id: int, request: Request, db: Session = Depends(
     expense = db.query(Expense).filter(Expense.id == expense_id, Expense.user_id == user.id).first()
     if expense:
         form = await request.form()
-        expense.date        = date.fromisoformat(form.get("date"))
+        expense.date        = safe_date(form.get("date"), expense.date)
         expense.description = form.get("description", "").strip()
-        expense.amount      = float(form.get("amount", 0))
+        expense.amount      = safe_float(form.get("amount"), 0.0)
         expense.category    = form.get("category", "Other")
         db.commit()
     return RedirectResponse("/expenses/", status_code=302)
