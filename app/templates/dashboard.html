@@ -20,7 +20,7 @@
   <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 hover:shadow-md transition-shadow">
     <div class="flex items-start justify-between mb-2">
       <p class="text-xs font-bold text-slate-500 uppercase tracking-wide">Total Earned</p>
-      <div class="bg-emerald-100 text-emerald-600 rounded-lg p-2 text-xs">💰</div>
+      <div class="bg-emerald-100 text-emerald-600 rounded-lg w-7 h-7 flex items-center justify-center text-xs"><i class="fas fa-sack-dollar"></i></div>
     </div>
     {% if paid_totals %}
       {% for cur, amt in paid_totals.items() %}
@@ -29,7 +29,7 @@
       </p>
       {% endfor %}
     {% else %}
-      <p class="text-xl font-bold text-slate-300">—</p>
+      <p class="text-xl font-bold text-slate-300">0.00</p>
     {% endif %}
     <p class="text-xs text-slate-400 mt-1">Paid invoices, all time</p>
   </div>
@@ -37,7 +37,7 @@
   <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 hover:shadow-md transition-shadow">
     <div class="flex items-start justify-between mb-2">
       <p class="text-xs font-bold text-slate-500 uppercase tracking-wide">Pending</p>
-      <div class="bg-amber-100 text-amber-500 rounded-lg p-2 text-xs">⏳</div>
+      <div class="bg-amber-100 text-amber-500 rounded-lg w-7 h-7 flex items-center justify-center text-xs"><i class="fas fa-hourglass-half"></i></div>
     </div>
     {% if pending_totals %}
       {% for cur, amt in pending_totals.items() %}
@@ -46,7 +46,7 @@
       </p>
       {% endfor %}
     {% else %}
-      <p class="text-xl font-bold text-slate-300">—</p>
+      <p class="text-xl font-bold text-slate-300">0.00</p>
     {% endif %}
     <p class="text-xs text-slate-400 mt-1">Awaiting payment</p>
   </div>
@@ -54,7 +54,7 @@
   <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 hover:shadow-md transition-shadow">
     <div class="flex items-start justify-between mb-2">
       <p class="text-xs font-bold text-slate-500 uppercase tracking-wide">Overdue</p>
-      <div class="bg-red-100 text-red-500 rounded-lg p-2 text-xs">🚨</div>
+      <div class="bg-red-100 text-red-500 rounded-lg w-7 h-7 flex items-center justify-center text-xs"><i class="fas fa-triangle-exclamation"></i></div>
     </div>
     {% if overdue_totals %}
       {% for cur, amt in overdue_totals.items() %}
@@ -63,7 +63,7 @@
       </p>
       {% endfor %}
     {% else %}
-      <p class="text-xl font-bold text-slate-300">—</p>
+      <p class="text-xl font-bold text-slate-300">0.00</p>
     {% endif %}
     <p class="text-xs text-slate-400 mt-1">Past due date</p>
   </div>
@@ -71,7 +71,7 @@
   <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 hover:shadow-md transition-shadow">
     <div class="flex items-start justify-between mb-2">
       <p class="text-xs font-bold text-slate-500 uppercase tracking-wide">Expenses {{ current_year }}</p>
-      <div class="bg-slate-100 text-slate-500 rounded-lg p-2 text-xs">🧾</div>
+      <div class="bg-slate-100 text-slate-500 rounded-lg w-7 h-7 flex items-center justify-center text-xs"><i class="fas fa-receipt"></i></div>
     </div>
     <p class="text-xl font-bold text-slate-700">${{ "%.2f"|format(total_expenses) }}</p>
     <p class="text-xs text-slate-400 mt-1">Business costs this year</p>
