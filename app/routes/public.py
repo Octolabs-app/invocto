@@ -19,7 +19,13 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("/invoice/{token}", response_class=HTMLResponse)
 async def public_invoice(token: str, request: Request, db: Session = Depends(get_db)):
     """Public invoice view — no auth required. Accessible via emailed link."""
-    invoice = db.query(Invoice).filter(Invoice.view_token == token).first()
+    # view_token is a uuid column in Postgres; a malformed token would raise a
+    # cast error. Guard so a bad/old link returns a clean 404 instead of a 500.
+    try:
+        invoice = db.query(Invoice).filter(Invoice.view_token == token).first()
+    except Exception:
+        db.rollback()
+        invoice = None
     if not invoice:
         return HTMLResponse("<h2>Invoice not found or link has expired.</h2>", status_code=404)
     return templates.TemplateResponse("invoice_public.html", {
