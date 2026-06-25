@@ -1,5 +1,5 @@
 """
-email.py — Async email sender for Tax-Ready Invoice.
+email.py — Async email sender for Invocto.
 Supports SMTP (default) or SendGrid (set EMAIL_PROVIDER=sendgrid).
 Fails silently with a logged warning — never crashes the app.
 
@@ -104,7 +104,7 @@ def _render_invoice_email(invoice, user_email: str) -> tuple[str, str]:
       </div>
 
       <p style="color:#94a3b8;font-size:12px;text-align:center;margin-top:24px;">
-        Sent from <a href="{APP_URL}" style="color:#6366f1;">Tax-Ready Invoice</a>
+        Sent from <a href="{APP_URL}" style="color:#6366f1;">Invocto</a>
         &nbsp;&middot;&nbsp; {user_email}
       </p>
     </div>
@@ -160,7 +160,7 @@ def _render_reminder_email(invoice, reminder_type: str) -> tuple[str, str]:
     return subject, html
 
 
-def send_email(to: str, subject: str, html: str, from_name: str = "Tax-Ready Invoice") -> bool:
+def send_email(to: str, subject: str, html: str, from_name: str = "Invocto") -> bool:
     """
     Send an HTML email. Returns True on success, False on failure.
     Never raises — errors are logged as warnings.

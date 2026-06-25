@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Tax-Ready Invoice",
+    title="Invocto",
     version="3.0.0",
     docs_url=None,
     redoc_url=None,

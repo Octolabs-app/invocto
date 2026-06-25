@@ -1,5 +1,5 @@
 /**
- * main.js — Shared vanilla JavaScript for Tax-Ready Invoice
+ * main.js — Shared vanilla JavaScript for Invocto
  *
  * Loaded on every page via base.html.
  * Page-specific JS lives in the {% block scripts %} of each template.

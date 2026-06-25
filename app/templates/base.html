@@ -3,39 +3,62 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>{% block title %}Tax-Ready Invoice{% endblock %}</title>
+  <title>{% block title %}Invocto{% endblock %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+        colors: {
+          brand: { 50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',
+                   500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81',950:'#1e1b4b' },
+          ink: '#0b1020',
+        },
+      } }
+    }
+  </script>
   <style>
-    .nav-link { transition: background 0.12s ease, color 0.12s ease; }
-    .nav-group-label { font-size:.6rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; padding:.75rem .75rem .25rem; color:#6366f1; opacity:.6; }
+    body { -webkit-font-smoothing: antialiased; }
+    .nav-link { transition: all .14s ease; position:relative; }
+    .nav-link.active { background: linear-gradient(90deg, rgba(99,102,241,.22), rgba(99,102,241,.06)); color:#fff; }
+    .nav-link.active::before { content:''; position:absolute; left:0; top:18%; bottom:18%; width:3px; border-radius:0 3px 3px 0; background:linear-gradient(180deg,#818cf8,#6366f1); }
+    .nav-group-label { font-size:.6rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; padding:.85rem .75rem .3rem; color:#8b93f8; opacity:.55; }
     aside::-webkit-scrollbar { width:3px; }
-    aside::-webkit-scrollbar-thumb { background:rgba(255,255,255,.1); border-radius:2px; }
-    /* Keyboard shortcut badge */
-    .kbd { display:inline-flex;align-items:center;padding:.1rem .35rem;font-size:.6rem;font-family:monospace;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:.25rem;color:rgba(255,255,255,.4);margin-left:auto; }
+    aside::-webkit-scrollbar-thumb { background:rgba(255,255,255,.12); border-radius:2px; }
+    .kbd { display:inline-flex;align-items:center;padding:.1rem .35rem;font-size:.6rem;font-family:ui-monospace,monospace;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:.3rem;color:rgba(255,255,255,.45);margin-left:auto; }
+    .logo-mark { background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 55%,#a855f7 100%); box-shadow:0 6px 18px -4px rgba(99,102,241,.55); }
   </style>
 </head>
 <body class="h-full bg-slate-50 text-slate-800 font-sans">
 <div class="flex h-screen overflow-hidden">
 
   <!-- ── Sidebar ──────────────────────────────────────────────────────── -->
-  <aside class="w-56 shrink-0 bg-indigo-950 text-indigo-100 flex flex-col shadow-xl z-10">
+  <aside class="w-56 shrink-0 bg-gradient-to-b from-[#0b1020] via-[#15123a] to-[#1e1b4b] text-indigo-100 flex flex-col shadow-2xl z-10 border-r border-white/5">
     <!-- Brand -->
-    <div class="px-5 py-4 border-b border-indigo-900">
-      <div class="flex items-center gap-2.5">
-        <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-black text-sm">T</div>
-        <div>
-          <p class="font-bold text-white text-sm leading-tight">Tax-Ready</p>
-          <p class="text-indigo-400 text-xs">Invoice Manager</p>
+    <div class="px-5 py-4 border-b border-white/5">
+      <a href="/" class="flex items-center gap-2.5">
+        <div class="logo-mark w-9 h-9 rounded-xl flex items-center justify-center shrink-0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 2.5h8.2L20 7.8V19.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-15a2 2 0 0 1 2-2Z" fill="white" fill-opacity="0.95"/>
+            <path d="M7.6 9.6h7M7.6 12.5h7M7.6 15.4h4.2" stroke="#6366f1" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
         </div>
-      </div>
+        <div class="leading-tight">
+          <p class="font-extrabold text-white text-[15px] tracking-tight">Invocto</p>
+          <p class="text-indigo-300/70 text-[10px] font-semibold tracking-wider uppercase">E-invoicing suite</p>
+        </div>
+      </a>
     </div>
 
     <!-- Quick action -->
     <div class="px-3 pt-3 pb-1">
       <a href="/invoices/new"
-         class="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition-colors w-full">
+         class="flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-bold px-3 py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-900/40 w-full">
         <i class="fas fa-plus"></i> New Invoice
         <span class="kbd">N</span>
       </a>
@@ -47,56 +70,56 @@
 
       <p class="nav-group-label">Overview</p>
       <a href="/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
-         {% if path == '/' %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+         {% if path == '/' %}active{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
         <i class="fas fa-gauge-high w-4 text-center text-[11px]"></i> Dashboard
       </a>
 
       <p class="nav-group-label mt-1">Work</p>
       <a href="/clients/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
-         {% if '/clients' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+         {% if '/clients' in path %}active{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
         <i class="fas fa-users w-4 text-center text-[11px]"></i> Clients
       </a>
       <a href="/invoices/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
-         {% if '/invoices' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+         {% if '/invoices' in path %}active{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
         <i class="fas fa-file-invoice-dollar w-4 text-center text-[11px]"></i> Invoices
       </a>
       <a href="/estimates/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
-         {% if '/estimates' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+         {% if '/estimates' in path %}active{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
         <i class="fas fa-file-contract w-4 text-center text-[11px]"></i> Estimates
       </a>
       <a href="/recurring/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
-         {% if '/recurring' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+         {% if '/recurring' in path %}active{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
         <i class="fas fa-rotate w-4 text-center text-[11px]"></i> Recurring
       </a>
       <a href="/time/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
-         {% if path.startswith('/time') %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+         {% if path.startswith('/time') %}active{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
         <i class="fas fa-clock w-4 text-center text-[11px]"></i> Time Tracker
       </a>
       <a href="/items/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
-         {% if '/items' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+         {% if '/items' in path %}active{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
         <i class="fas fa-box-archive w-4 text-center text-[11px]"></i> Item Library
       </a>
 
       <p class="nav-group-label mt-1">Finance</p>
       <a href="/expenses/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
-         {% if '/expenses' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+         {% if '/expenses' in path %}active{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
         <i class="fas fa-receipt w-4 text-center text-[11px]"></i> Expenses
       </a>
       <a href="/reports/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
-         {% if '/reports' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+         {% if '/reports' in path %}active{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
         <i class="fas fa-chart-pie w-4 text-center text-[11px]"></i> Tax Reports
       </a>
 
       <p class="nav-group-label mt-1">Account</p>
       <a href="/profile/" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
-         {% if '/profile' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+         {% if '/profile' in path %}active{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
         <i class="fas fa-user-circle w-4 text-center text-[11px]"></i> My Profile
       </a>
       <a href="/billing/upgrade" class="nav-link flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-medium
-         {% if '/billing' in path %}bg-indigo-700 text-white{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
-        <i class="fas fa-star w-4 text-center text-[11px]"></i>
-        <span>Upgrade Pro</span>
-        <span class="ml-auto bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">$9</span>
+         {% if '/billing' in path %}active{% else %}text-indigo-300 hover:bg-indigo-800/60 hover:text-white{% endif %}">
+        <i class="fas fa-heart w-4 text-center text-[11px] text-rose-400"></i>
+        <span>Support Invocto</span>
+        <span class="ml-auto bg-emerald-500/20 text-emerald-300 text-[9px] font-bold px-1.5 py-0.5 rounded-full">FREE</span>
       </a>
     </nav>
 

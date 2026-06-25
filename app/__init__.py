@@ -1,1 +1,1 @@
-# Tax-Ready Invoice — FastAPI Application Package
+# Invocto — FastAPI Application Package
