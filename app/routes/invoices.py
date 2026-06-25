@@ -6,7 +6,7 @@ from datetime import date
 from typing import Optional
 import httpx
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,7 @@ from ..database import get_db
 from ..models import Client, Invoice, LineItem, UserProfile
 from ..auth import get_current_user
 from ..utils import safe_float, safe_int, safe_date, next_sequence_number
+from ..einvoice import invoice_to_ubl
 
 router = APIRouter(prefix="/invoices")
 templates = Jinja2Templates(directory="app/templates")
@@ -289,6 +290,22 @@ async def print_invoice(invoice_id: int, request: Request, db: Session = Depends
     profile = _get_profile(db, user.id)
     return templates.TemplateResponse("invoice_print.html", {
         "request": request, "invoice": invoice, "user": user, "profile": profile,
+    })
+
+
+# ── E-invoice (UBL / EN 16931 XML) ────────────────────────────────────────────
+@router.get("/{invoice_id}/einvoice.xml")
+async def invoice_einvoice(invoice_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    invoice = db.query(Invoice).filter(Invoice.id == invoice_id, Invoice.user_id == user.id).first()
+    if not invoice:
+        return RedirectResponse("/invoices/", status_code=302)
+    profile = _get_profile(db, user.id)
+    xml = invoice_to_ubl(invoice, profile, user.email)
+    return Response(content=xml, media_type="application/xml", headers={
+        "Content-Disposition": f'attachment; filename="einvoice_{invoice.invoice_number}.xml"'
     })
 
 

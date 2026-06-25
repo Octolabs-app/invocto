@@ -80,7 +80,7 @@ app.include_router(estimates_router)
 app.include_router(time_router)
 app.include_router(recurring_router)
 
-_PUBLIC = ("/login", "/register", "/static", "/billing/webhook", "/invoice/")
+_PUBLIC = ("/login", "/register", "/start", "/static", "/billing/webhook", "/invoice/")
 
 @app.middleware("http")
 async def require_login_middleware(request: Request, call_next):
@@ -93,7 +93,8 @@ async def require_login_middleware(request: Request, call_next):
     # forged token is rejected at the gate rather than leaking past it.
     token = request.cookies.get(COOKIE_NAME)
     if not token or decode_token(token) is None:
-        resp = RedirectResponse(url="/login", status_code=302)
+        # No valid session → hand them an instant guest workspace (no sign-up).
+        resp = RedirectResponse(url="/start", status_code=302)
         if token:
             resp.delete_cookie(COOKIE_NAME)
         return resp

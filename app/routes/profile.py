@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import UserProfile
-from ..auth import get_current_user
+from ..auth import get_current_user, is_guest
 
 router = APIRouter(prefix="/profile")
 templates = Jinja2Templates(directory="app/templates")
@@ -45,7 +45,9 @@ async def profile_page(request: Request, db: Session = Depends(get_db)):
         "user":               user,
         "profile":            profile,
         "invoice_templates":  INVOICE_TEMPLATES,
+        "is_guest":           is_guest(user),
         "success":            request.query_params.get("success"),
+        "error":              request.query_params.get("error"),
     })
 
 

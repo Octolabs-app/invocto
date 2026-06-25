@@ -7,6 +7,7 @@ Uses:
   - httpOnly cookies to store the token (not accessible via JS → XSS protection)
 """
 import os
+import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -30,6 +31,10 @@ ALGORITHM   = "HS256"
 COOKIE_NAME = "access_token"
 TOKEN_EXPIRE_DAYS = 7
 
+# Guest (instant) workspaces use a sentinel email domain so we can tell an
+# un-claimed visitor apart from a real account without a schema change.
+GUEST_DOMAIN = "guest.invocto.local"
+
 # Fail hard in production rather than silently signing tokens with a public,
 # well-known default key (which would let anyone forge a session for any user).
 # We treat a non-SQLite DATABASE_URL as "production".
@@ -45,6 +50,28 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def hash_password(plain: str) -> str:
     return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode("utf-8")
+
+# ── Guest / instant workspace ──────────────────────────────────────────────────
+def is_guest(user) -> bool:
+    """True if the user is an un-claimed instant workspace."""
+    return bool(user and user.email and user.email.endswith("@" + GUEST_DOMAIN))
+
+def create_guest_user(db: Session) -> User:
+    """Create a fresh anonymous workspace with an unusable random password."""
+    guest = User(
+        email=f"guest_{uuid.uuid4().hex}@{GUEST_DOMAIN}",
+        hashed_password=hash_password(uuid.uuid4().hex),
+    )
+    db.add(guest)
+    db.commit()
+    db.refresh(guest)
+    return guest
+
+def _set_auth_cookie(response, user_id: int) -> None:
+    response.set_cookie(
+        COOKIE_NAME, create_token(user_id),
+        httponly=True, max_age=TOKEN_EXPIRE_DAYS * 86_400, samesite="lax"
+    )
 
 # ── JWT helpers ───────────────────────────────────────────────────────────────
 def create_token(user_id: int) -> str:
@@ -145,8 +172,49 @@ async def register_submit(request: Request, db: Session = Depends(get_db)):
     )
     return response
 
+# ── Instant workspace ──────────────────────────────────────────────────────────
+@router.get("/start")
+async def start_workspace(request: Request, db: Session = Depends(get_db)):
+    """Zero-friction entry: spin up a private guest workspace and drop the
+    visitor straight into the app — no sign-up required."""
+    # If they already have a valid session, don't create a duplicate.
+    existing = get_current_user(request, db)
+    if existing:
+        return RedirectResponse(url="/", status_code=302)
+    guest = create_guest_user(db)
+    response = RedirectResponse(url="/", status_code=302)
+    _set_auth_cookie(response, guest.id)
+    return response
+
+@router.post("/claim")
+async def claim_workspace(request: Request, db: Session = Depends(get_db)):
+    """Let a guest attach an email + password so they can return to this
+    workspace later (and from other devices)."""
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse(url="/start", status_code=302)
+    form     = await request.form()
+    email    = form.get("email", "").strip().lower()
+    password = form.get("password", "")
+    confirm  = form.get("confirm_password", "")
+
+    if len(email) < 3 or "@" not in email or email.endswith("@" + GUEST_DOMAIN):
+        return RedirectResponse("/profile/?error=claim_email", status_code=302)
+    if len(password) < 8:
+        return RedirectResponse("/profile/?error=claim_password", status_code=302)
+    if password != confirm:
+        return RedirectResponse("/profile/?error=claim_match", status_code=302)
+    taken = db.query(User).filter(User.email == email).first()
+    if taken and taken.id != user.id:
+        return RedirectResponse("/profile/?error=claim_taken", status_code=302)
+
+    user.email = email
+    user.hashed_password = hash_password(password)
+    db.commit()
+    return RedirectResponse("/profile/?success=claimed", status_code=302)
+
 @router.get("/logout")
 async def logout():
-    response = RedirectResponse(url="/login", status_code=302)
+    response = RedirectResponse(url="/start", status_code=302)
     response.delete_cookie(COOKIE_NAME)
     return response

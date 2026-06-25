@@ -38,6 +38,45 @@
   {% endif %}
 </div>
 
+{% if error and error.startswith('claim') %}
+<div class="mb-5 flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+  <i class="fas fa-circle-exclamation"></i>
+  {% if error == 'claim_email' %}Please enter a valid email address.
+  {% elif error == 'claim_password' %}Password must be at least 8 characters.
+  {% elif error == 'claim_match' %}Passwords do not match.
+  {% elif error == 'claim_taken' %}That email is already registered. Try logging in instead.
+  {% else %}Could not save your workspace. Please try again.{% endif %}
+</div>
+{% endif %}
+
+{% if is_guest %}
+<!-- Claim workspace — guests can attach an email + password to keep their data -->
+<div class="mb-6 rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 p-5">
+  <div class="flex items-start gap-3">
+    <span class="text-2xl">🔐</span>
+    <div class="flex-1">
+      <p class="font-bold text-amber-800">You're on a guest workspace</p>
+      <p class="text-sm text-amber-700 mb-4">Your invoices live in this browser. Add an email &amp; password to keep them safe and sign in from anywhere — it's free.</p>
+      <form method="POST" action="/claim" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <input name="email" type="email" required placeholder="you@email.com"
+               class="field-input" autocomplete="email"/>
+        <input name="password" type="password" required placeholder="Password (8+ chars)"
+               class="field-input" autocomplete="new-password"/>
+        <input name="confirm_password" type="password" required placeholder="Confirm password"
+               class="field-input" autocomplete="new-password"/>
+        <div class="sm:col-span-3">
+          <button type="submit"
+                  class="bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold px-5 py-2.5 rounded-lg">
+            Save my workspace
+          </button>
+          <span class="text-xs text-amber-600 ml-2">Already have an account? <a href="/login" class="underline font-semibold">Log in</a></span>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <form id="profileForm" method="POST" action="/profile/save" enctype="multipart/form-data"
       class="grid grid-cols-1 lg:grid-cols-2 gap-5">
 

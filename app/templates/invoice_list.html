@@ -176,6 +176,13 @@ document.addEventListener('change', e => { if (e.target.classList.contains('row-
               <i class="fas fa-print"></i>
             </a>
 
+            <!-- e-Invoice XML (UBL / EN 16931) -->
+            <a href="/invoices/{{ inv.id }}/einvoice.xml"
+               title="Download e-invoice (UBL / EN 16931 XML)"
+               class="text-slate-400 hover:text-teal-600 transition-colors text-sm">
+              <i class="fas fa-file-code"></i>
+            </a>
+
             <!-- Edit -->
             <a href="/invoices/{{ inv.id }}/edit"
                title="Edit"
